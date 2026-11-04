@@ -18,6 +18,27 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  #app.hub-view #playerbar, #app.hub-view #stage, #app.hub-view #now, #app.hub-view #controls, #app.hub-view #list { display: none; }
+  #app.player-view #hub { display: none; }
+  #hub { flex: 0 0 auto; padding: 12px; background: #151515; border-bottom: 1px solid #292929; display: grid; gap: 10px; }
+  #hub-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  #hub-title img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
+  #hub-title h1 { margin: 0; font-size: 18px; line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #hub-title p { margin: 3px 0 0; color: #aaa; font-size: 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #blogs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; overscroll-behavior-x: contain; }
+  #blogs button { min-width: min(320px, 82vw); border: 1px solid #30363d; border-radius: 8px; padding: 10px; background: #0d1117; color: #fff; display: grid; grid-template-columns: 38px 1fr auto; gap: 9px; align-items: center; text-align: left; cursor: pointer; }
+  #blogs button.active { border-color: #58a6ff; background: #101a27; }
+  #blogs img { width: 38px; height: 38px; border-radius: 7px; object-fit: cover; }
+  #blogs .blog-name { display: block; font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #blogs .blog-desc { display: block; margin-top: 2px; color: #9aa4af; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #blogs a { color: #58a6ff; font-size: 11px; font-weight: 700; text-decoration: none; padding: 6px; border-radius: 6px; }
+  #blogs a:active { background: rgba(88,166,255,.14); }
+  #playerbar { flex: 0 0 auto; height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 6px; background: #000; border-bottom: 1px solid #070707; overflow: hidden; white-space: nowrap; }
+  #back-to-hub { flex: 0 0 auto; max-width: 78px; height: 36px; border: 0; border-radius: 8px; padding: 0 7px 0 2px; background: transparent; color: #0a84ff; font: inherit; font-size: 17px; display: inline-flex; align-items: center; gap: 1px; overflow: hidden; white-space: nowrap; cursor: pointer; }
+  #back-to-hub:active { background: rgba(10,132,255,.12); }
+  #back-to-hub span:first-child { flex: 0 0 auto; font-size: 30px; line-height: 1; margin-top: -2px; }
+  #back-to-hub span:last-child { min-width: 0; overflow: hidden; text-overflow: clip; }
+  #player-title { flex: 1 1 auto; min-width: 0; text-align: center; margin-right: 52px; color: #aaa; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
   #stage { position: relative; flex: 0 0 auto; height: min(34dvh, 56.25vw); min-height: 120px; background: #000; cursor: pointer; user-select: none; -webkit-user-select: none; }
   #stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
   #badge { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; transition: opacity .2s; }
@@ -50,7 +71,21 @@
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app" class="hub-view">
+  <section id="hub" aria-label="Video blogs">
+    <div id="hub-title">
+      <img id="hub-art" src="artwork.jpg" alt="">
+      <div>
+        <h1 id="hub-name">Video Blogs</h1>
+        <p id="hub-desc">SharePoint-backed RSS video feeds</p>
+      </div>
+    </div>
+    <div id="blogs" role="list"></div>
+  </section>
+  <header id="playerbar">
+    <button id="back-to-hub" type="button" aria-label="Back to video blogs"><span aria-hidden="true">&#8249;</span><span>Back</span></button>
+    <div id="player-title"></div>
+  </header>
   <div id="stage" title="Tap to play or pause">
     <video id="video" playsinline webkit-playsinline preload="metadata"></video>
     <div id="badge"><span>&#9654;</span></div>
@@ -76,9 +111,15 @@
 (() => {
   const KEY = `video-podcast-player-v1:${location.pathname}`;
   const show = { title: 'Video Podcast', author: '', artwork: 'artwork.jpg' };
+  const app = document.getElementById('app');
   const video = document.getElementById('video');
   const stage = document.getElementById('stage');
   const list = document.getElementById('list');
+  const blogsList = document.getElementById('blogs');
+  const playerTitle = document.getElementById('player-title');
+  const hubName = document.getElementById('hub-name');
+  const hubDesc = document.getElementById('hub-desc');
+  const hubArt = document.getElementById('hub-art');
   const now = document.getElementById('now');
   const controls = document.getElementById('controls');
   const scrub = document.getElementById('scrub');
@@ -103,16 +144,64 @@
     if (!scrubbing) scrub.value = d ? video.currentTime / d * 1000 : 0;
   };
   let episodes = [];
-  let state = { index: 0, times: {} };
+  let blogs = [];
+  let activeBlog = 0;
+  let state = { blog: 0, index: 0, times: {}, view: 'hub' };
   let lastSave = 0;
 
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
 
+  function episodeKey(ep) {
+    return `${blogs[activeBlog]?.episodes || 'episodes.json'}:${ep.file}`;
+  }
+
+  function rememberCurrentTime() {
+    if (episodes[state.index] && video.src && !video.ended) state.times[episodeKey(episodes[state.index])] = video.currentTime;
+  }
+
+  function showHub() {
+    rememberCurrentTime();
+    video.pause();
+    app.className = 'hub-view';
+    state.view = 'hub';
+    save();
+  }
+
+  function showPlayer() {
+    app.className = 'player-view';
+    state.view = 'player';
+    state.blog = activeBlog;
+    save();
+  }
+
   function applyShowMetadata(metadata) {
     Object.assign(show, metadata || {});
     document.title = show.title;
+    hubName.textContent = show.title;
+    hubDesc.textContent = show.description || 'SharePoint-backed RSS video feeds';
+    hubArt.src = show.artwork || 'artwork.jpg';
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
+  }
+
+  function renderBlogs() {
+    blogsList.innerHTML = '';
+    blogs.forEach((blog, i) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = i === activeBlog ? 'active' : '';
+      button.setAttribute('role', 'listitem');
+      const img = Object.assign(document.createElement('img'), { src: blog.artwork || show.artwork, alt: '', loading: 'lazy' });
+      const label = document.createElement('span');
+      label.innerHTML = '<span class="blog-name"></span><span class="blog-desc"></span>';
+      label.querySelector('.blog-name').textContent = blog.title;
+      label.querySelector('.blog-desc').textContent = blog.description || '';
+      const feed = Object.assign(document.createElement('a'), { href: blog.feed || 'feed.xml', textContent: 'RSS', target: '_blank', rel: 'noopener' });
+      feed.addEventListener('click', (event) => event.stopPropagation());
+      button.append(img, label, feed);
+      button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
+      blogsList.append(button);
+    });
   }
 
   function render() {
@@ -140,6 +229,7 @@
     [...list.children].forEach((li, i) => li.classList.toggle('active', i === state.index));
     const ep = episodes[state.index];
     now.textContent = ep.number + ' ' + ep.title;
+    playerTitle.textContent = show.title;
     document.title = show.title ? `${ep.title} - ${show.title}` : ep.title;
     list.children[state.index]?.scrollIntoView({ block: 'nearest' });
     if ('mediaSession' in navigator) {
@@ -150,9 +240,9 @@
   function select(i, autoplay) {
     if (i < 0 || i >= episodes.length) return;
     if (i !== state.index || !video.src) {
-      if (video.src && !video.ended) state.times[episodes[state.index].file] = video.currentTime;
+      rememberCurrentTime();
       state.index = i;
-      const resume = state.times[episodes[i].file] || 0;
+      const resume = state.times[episodeKey(episodes[i])] || 0;
       video.src = episodes[i].url;
       video.addEventListener('loadedmetadata', () => {
         if (resume > 0 && resume < video.duration - 2) video.currentTime = resume;
@@ -166,6 +256,29 @@
     if (autoplay) video.play().catch(() => {});
   }
 
+  function loadBlog(i, options = {}) {
+    const blog = blogs[i];
+    if (!blog) return;
+    rememberCurrentTime();
+    activeBlog = i;
+    state.blog = i;
+    if (!options.restore) state.index = 0;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    Object.assign(show, { title: blog.title, description: blog.description || show.description, author: blog.author || show.author, artwork: blog.artwork || show.artwork });
+    document.title = show.title;
+    renderBlogs();
+    return fetch(blog.episodes || 'episodes.json').then((r) => r.json()).then((data) => {
+      episodes = data;
+      if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;
+      render();
+      if (episodes.length) select(state.index, false);
+      if (options.openPlayer) showPlayer();
+    });
+  }
+
+  document.getElementById('back-to-hub').addEventListener('click', showHub);
   stage.addEventListener('click', togglePlay);
   document.getElementById('toggle').addEventListener('click', togglePlay);
   document.getElementById('back').addEventListener('click', () => skip(-10));
@@ -192,15 +305,17 @@
     const t = Date.now();
     if (t - lastSave > 2000 && !video.ended) {
       lastSave = t;
-      state.times[episodes[state.index].file] = video.currentTime;
+      rememberCurrentTime();
+      state.view = 'player';
+      state.blog = activeBlog;
       save();
     }
   });
   video.addEventListener('pause', () => {
-    if (!video.ended && episodes.length) { state.times[episodes[state.index].file] = video.currentTime; save(); }
+    if (!video.ended && episodes.length) { rememberCurrentTime(); save(); }
   });
   video.addEventListener('ended', () => {
-    state.times[episodes[state.index].file] = 0;
+    state.times[episodeKey(episodes[state.index])] = 0;
     if (state.index + 1 < episodes.length) select(state.index + 1, true);
     else save();
   });
@@ -214,14 +329,14 @@
 
   Promise.all([
     fetch('site.json').then((r) => r.ok ? r.json() : {}).catch(() => ({})),
-    fetch('episodes.json').then((r) => r.json()),
+    fetch('blogs.json').then((r) => r.ok ? r.json() : []).catch(() => []),
   ]).then(([metadata, data]) => {
     applyShowMetadata(metadata);
-    episodes = data;
-    if (!episodes.length) return;
-    if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;
-    render();
-    select(state.index, false);
+    blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.jpg', feed: metadata.feed || 'feed.xml', episodes: 'episodes.json' }];
+    renderBlogs();
+    const restorePlayer = state.view === 'player';
+    const blogToLoad = restorePlayer && state.blog >= 0 && state.blog < blogs.length ? state.blog : 0;
+    loadBlog(blogToLoad, { restore: restorePlayer, openPlayer: restorePlayer });
   });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

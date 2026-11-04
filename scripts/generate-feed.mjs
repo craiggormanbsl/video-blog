@@ -162,12 +162,20 @@ ${items.join('\n')}
 await writeFile(path.join(outputDirectory, 'feed.xml'), feed);
 await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
 await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
+  title: config.siteTitle || 'SharePoint Video Blogs',
+  description: config.siteDescription || 'Video feeds published from SharePoint-backed media libraries.',
+  author: config.author,
+  artwork: 'artwork.jpg',
+  feed: feedUrl,
+}, null, 2));
+await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.blogs || [{
   title: config.title,
   description: config.description,
   author: config.author,
   artwork: 'artwork.jpg',
   feed: feedUrl,
-}, null, 2));
+  episodes: 'episodes.json',
+}], null, 2));
 await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
 await copyFile(path.join(root, 'artwork.jpg'), path.join(outputDirectory, 'artwork.jpg'));
 console.log(`Generated ${items.length} episodes from ${path.relative(root, configPath)} at ${path.join(outputDirectory, 'feed.xml')}`);
