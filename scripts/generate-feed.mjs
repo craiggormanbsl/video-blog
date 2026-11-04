@@ -79,6 +79,11 @@ const feed = `<?xml version="1.0" encoding="UTF-8"?>
     <itunes:category text="${escapeXml(config.category)}">
       <itunes:category text="${escapeXml(config.subcategory)}" />
     </itunes:category>
+${config.image ? `    <itunes:image href="${escapeXml(config.image)}" />` : ''}
+${config.ownerName && config.ownerEmail ? `    <itunes:owner>
+      <itunes:name>${escapeXml(config.ownerName)}</itunes:name>
+      <itunes:email>${escapeXml(config.ownerEmail)}</itunes:email>
+    </itunes:owner>` : ''}
     <atom:link href="${escapeXml(`${siteUrl}/feed.xml`)}" rel="self" type="application/rss+xml" />
 ${items.join('\n')}
   </channel>
