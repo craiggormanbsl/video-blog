@@ -28,13 +28,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
       - name: Generate podcast feed
-        run: |
-          owner=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
-          repo=$(printf '%s' '${{ github.event.repository.name }}' | tr '[:upper:]' '[:lower:]')
-          export SITE_URL="https://${owner}.github.io/${repo}"
-          node scripts/generate-feed.mjs
-      - uses: actions/configure-pages@v5
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: node scripts/generate-feed.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
