@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Supply Chain Strategy</title>
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Supply Chain">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="artwork.jpg">
+<link rel="icon" href="artwork.jpg">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  #stage { position: relative; flex: 0 0 auto; height: min(34dvh, 56.25vw); min-height: 120px; background: #000; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  #stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #badge { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; transition: opacity .2s; }
+  #badge span { width: 56px; height: 56px; border-radius: 50%; background: rgba(0,0,0,.55); display: grid; place-items: center; font-size: 24px; padding-left: 4px; }
+  #stage.playing #badge { opacity: 0; }
+  #bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.2); }
+  #bar i { display: block; height: 100%; width: 0; background: #4da3ff; }
+  #now { flex: 0 0 auto; padding: 8px 14px; font-size: 14px; font-weight: 600; background: #111; border-bottom: 1px solid #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; background: #0b0b0b; }
+  #list li { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid #1c1c1c; }
+  #list li.active { background: #162536; }
+  #list img { width: 28px; height: 28px; border-radius: 5px; object-fit: cover; flex: 0 0 auto; }
+  #list .name { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.25; }
+  #list .num { color: #8a8a8a; margin-right: 6px; }
+  #list button { flex: 0 0 auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #1f6feb; color: #fff; font-size: 14px; cursor: pointer; }
+  #list li.active button { background: #2ea043; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage" title="Tap to play or pause">
+    <video id="video" playsinline webkit-playsinline preload="metadata"></video>
+    <div id="badge"><span>&#9654;</span></div>
+    <div id="bar"><i></i></div>
+  </div>
+  <div id="now"></div>
+  <ul id="list"></ul>
+</div>
+<script>
+(() => {
+  const KEY = 'scs-player-v1';
+  const video = document.getElementById('video');
+  const stage = document.getElementById('stage');
+  const list = document.getElementById('list');
+  const now = document.getElementById('now');
+  const bar = document.querySelector('#bar i');
+  let episodes = [];
+  let state = { index: 0, times: {} };
+  let lastSave = 0;
+
+  try { Object.assign(state, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+
+  function render() {
+    list.innerHTML = '';
+    episodes.forEach((ep, i) => {
+      const li = document.createElement('li');
+      li.dataset.i = i;
+      const img = Object.assign(document.createElement('img'), { src: 'artwork.jpg', alt: '', loading: 'lazy' });
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.innerHTML = '<span class="num"></span>';
+      name.querySelector('.num').textContent = ep.number;
+      name.append(ep.title);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '\u25B6';
+      btn.setAttribute('aria-label', 'Play ' + ep.title);
+      btn.addEventListener('click', () => select(i, true));
+      li.append(img, name, btn);
+      list.append(li);
+    });
+  }
+
+  function mark() {
+    [...list.children].forEach((li, i) => li.classList.toggle('active', i === state.index));
+    const ep = episodes[state.index];
+    now.textContent = ep.number + ' ' + ep.title;
+    document.title = ep.title;
+    list.children[state.index]?.scrollIntoView({ block: 'nearest' });
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: ep.title, artist: 'Supply Chain Strategy', artwork: [{ src: 'artwork.jpg' }] });
+    }
+  }
+
+  function select(i, autoplay) {
+    if (i < 0 || i >= episodes.length) return;
+    if (i !== state.index || !video.src) {
+      if (video.src && !video.ended) state.times[episodes[state.index].file] = video.currentTime;
+      state.index = i;
+      const resume = state.times[episodes[i].file] || 0;
+      video.src = episodes[i].url;
+      video.addEventListener('loadedmetadata', () => {
+        if (resume > 0 && resume < video.duration - 2) video.currentTime = resume;
+      }, { once: true });
+    } else if (autoplay && video.ended) {
+      video.currentTime = 0;
+    }
+    mark();
+    save();
+    if (autoplay) video.play().catch(() => {});
+  }
+
+  stage.addEventListener('click', () => { video.paused ? video.play().catch(() => {}) : video.pause(); });
+  video.addEventListener('play', () => stage.classList.add('playing'));
+  video.addEventListener('pause', () => stage.classList.remove('playing'));
+  video.addEventListener('timeupdate', () => {
+    if (video.duration) bar.style.width = (video.currentTime / video.duration * 100) + '%';
+    const t = Date.now();
+    if (t - lastSave > 2000 && !video.ended) {
+      lastSave = t;
+      state.times[episodes[state.index].file] = video.currentTime;
+      save();
+    }
+  });
+  video.addEventListener('pause', () => {
+    if (!video.ended && episodes.length) { state.times[episodes[state.index].file] = video.currentTime; save(); }
+  });
+  video.addEventListener('ended', () => {
+    state.times[episodes[state.index].file] = 0;
+    if (state.index + 1 < episodes.length) select(state.index + 1, true);
+    else save();
+  });
+
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('nexttrack', () => select(state.index + 1, true));
+    navigator.mediaSession.setActionHandler('previoustrack', () => select(state.index - 1, true));
+  }
+
+  fetch('episodes.json').then((r) => r.json()).then((data) => {
+    episodes = data;
+    if (!episodes.length) return;
+    if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;
+    render();
+    select(state.index, false);
+  });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>

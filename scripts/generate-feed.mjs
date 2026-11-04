@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,6 +50,7 @@ if (videoNames.length === 0) {
 await mkdir(path.join(outputDirectory, 'videos'), { recursive: true });
 
 const items = [];
+const episodes = [];
 for (const name of videoNames) {
   const sourcePath = path.join(videosDirectory, name);
   const fileInfo = await stat(sourcePath);
@@ -58,6 +59,12 @@ for (const name of videoNames) {
   const publishedAt = publicationDate(path.relative(root, sourcePath), fileInfo.mtime);
 
   await copyFile(sourcePath, path.join(outputDirectory, 'videos', name));
+  episodes.push({
+    number: name.match(/^(\d+)/)?.[1] ?? '',
+    title,
+    file: name,
+    url: `videos/${encodedPath(name)}`,
+  });
   items.push(`    <item>
       <title>${escapeXml(title)}</title>
       <guid isPermaLink="false">${escapeXml(mediaUrl)}</guid>
@@ -91,4 +98,7 @@ ${items.join('\n')}
 `;
 
 await writeFile(path.join(outputDirectory, 'feed.xml'), feed);
+await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
+await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
+await copyFile(path.join(root, 'artwork.jpg'), path.join(outputDirectory, 'artwork.jpg'));
 console.log(`Generated ${items.length} episodes at ${path.join(outputDirectory, 'feed.xml')}`);
