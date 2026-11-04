@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDirectory = path.join(root, 'dist');
 const videosDirectory = path.join(root, 'videos');
-const config = JSON.parse(await readFile(path.join(root, 'podcast.json'), 'utf8'));
+const configPath = path.resolve(root, process.env.PODCAST_CONFIG || 'podcast.json');
+const config = JSON.parse(await readFile(configPath, 'utf8'));
 const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
 const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
@@ -135,4 +136,4 @@ await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
 }, null, 2));
 await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
 await copyFile(path.join(root, 'artwork.jpg'), path.join(outputDirectory, 'artwork.jpg'));
-console.log(`Generated ${items.length} episodes at ${path.join(outputDirectory, 'feed.xml')}`);
+console.log(`Generated ${items.length} episodes from ${path.relative(root, configPath)} at ${path.join(outputDirectory, 'feed.xml')}`);

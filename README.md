@@ -16,6 +16,14 @@ To generate a static feed file that will be saved somewhere else, such as a prot
 
 ## Podcast details
 
-Edit `podcast.json` to set the show title, description, author, language, category, explicit-content flag, artwork, and owner contact details.
+Edit `podcast.json` to set the show title, description, author, language, category, explicit-content flag, artwork, and owner contact details. To build a different podcast from another config file, set `PODCAST_CONFIG`:
+
+```powershell
+$env:PODCAST_CONFIG='podcasts/example.sharepoint.json'
+$env:SITE_URL='https://OWNER.github.io/REPOSITORY'
+node scripts/generate-feed.mjs
+```
+
+For a SharePoint-directory backed podcast, put the directory URL in `mediaBaseUrl`. If the generated `feed.xml` will be copied into that same protected SharePoint directory, set `feedUrl` to its final SharePoint URL. See `podcasts/example.sharepoint.json` for the shape.
 
 This feed uses `video/mp4` enclosures. Podcast apps differ in their support for video episodes, and Apple Podcasts may require a compatible video-podcast delivery format and directory setup beyond publishing this RSS feed.
