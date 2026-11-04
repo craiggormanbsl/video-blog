@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /feed.xml
+Disallow: /episodes.json
+Disallow: /media/
+Disallow: /videos/
+Disallow: /artwork.jpg

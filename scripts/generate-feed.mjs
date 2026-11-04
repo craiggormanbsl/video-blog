@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { copyFile, cp, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +28,11 @@ function encodedPath(fileName) {
   return fileName.split('/').map(encodeURIComponent).join('/');
 }
 
+function publicMediaName(fileName) {
+  const hash = createHash('sha256').update(fileName).digest('hex').slice(0, 16);
+  return `${hash}.mp4`;
+}
+
 function publicationDate(filePath, modifiedAt) {
   try {
     const committedAt = execFileSync('git', ['log', '-1', '--format=%cI', '--', filePath], {
@@ -47,23 +53,26 @@ if (videoNames.length === 0) {
   throw new Error('No MP4 episodes found in videos/.');
 }
 
-await mkdir(path.join(outputDirectory, 'videos'), { recursive: true });
+await rm(outputDirectory, { recursive: true, force: true });
+await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
 
 const items = [];
 const episodes = [];
 for (const name of videoNames) {
   const sourcePath = path.join(videosDirectory, name);
   const fileInfo = await stat(sourcePath);
-  const mediaUrl = `${siteUrl}/videos/${encodedPath(name)}`;
+  const mediaName = publicMediaName(name);
+  const mediaPath = `media/${mediaName}`;
+  const mediaUrl = `${siteUrl}/${mediaPath}`;
   const title = name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
   const publishedAt = publicationDate(path.relative(root, sourcePath), fileInfo.mtime);
 
-  await copyFile(sourcePath, path.join(outputDirectory, 'videos', name));
+  await copyFile(sourcePath, path.join(outputDirectory, 'media', mediaName));
   episodes.push({
     number: name.match(/^(\d+)/)?.[1] ?? '',
     title,
     file: name,
-    url: `videos/${encodedPath(name)}`,
+    url: encodedPath(mediaPath),
   });
   items.push(`    <item>
       <title>${escapeXml(title)}</title>
