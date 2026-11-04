@@ -1,4 +1,4 @@
-const CACHE = 'scs-shell-v1';
+const CACHE = 'video-podcast-shell-v1';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'artwork.jpg'];
 
 self.addEventListener('install', (event) => {

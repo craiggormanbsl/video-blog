@@ -36,6 +36,7 @@ jobs:
       - name: Generate podcast feed
         env:
           SITE_URL: ${{ steps.pages.outputs.base_url }}
+          MEDIA_BASE_URL: https://bluescopeltd.sharepoint.com/sites/ASPITArchitectureRepository/Shared%20Documents/Published%20Documents/mp4
         run: node scripts/generate-feed.mjs
       - uses: actions/upload-pages-artifact@v3
         with:

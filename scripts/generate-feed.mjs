@@ -9,6 +9,8 @@ const outputDirectory = path.join(root, 'dist');
 const videosDirectory = path.join(root, 'videos');
 const config = JSON.parse(await readFile(path.join(root, 'podcast.json'), 'utf8'));
 const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
+const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
+const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
 
 if (!siteUrl) {
   throw new Error('Set SITE_URL to the public HTTPS URL for this GitHub Pages site.');
@@ -33,6 +35,14 @@ function publicMediaName(fileName) {
   return `${hash}.mp4`;
 }
 
+async function localFileInfo(filePath) {
+  try {
+    return await stat(filePath);
+  } catch {
+    return null;
+  }
+}
+
 function publicationDate(filePath, modifiedAt) {
   try {
     const committedAt = execFileSync('git', ['log', '-1', '--format=%cI', '--', filePath], {
@@ -45,40 +55,48 @@ function publicationDate(filePath, modifiedAt) {
   return modifiedAt;
 }
 
-const videoNames = (await readdir(videosDirectory))
-  .filter((name) => name.toLowerCase().endsWith('.mp4'))
-  .sort((left, right) => left.localeCompare(right, 'en'));
+const configuredEpisodes = Array.isArray(config.episodes) ? config.episodes : [];
+const videoNames = configuredEpisodes.length
+  ? configuredEpisodes.map((episode) => episode.file)
+  : (await readdir(videosDirectory))
+    .filter((name) => name.toLowerCase().endsWith('.mp4'))
+    .sort((left, right) => left.localeCompare(right, 'en'));
 
 if (videoNames.length === 0) {
   throw new Error('No MP4 episodes found in videos/.');
 }
 
 await rm(outputDirectory, { recursive: true, force: true });
-await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
+await mkdir(outputDirectory, { recursive: true });
+if (!mediaBaseUrl) await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
 
 const items = [];
 const episodes = [];
 for (const name of videoNames) {
+  const configuredEpisode = configuredEpisodes.find((episode) => episode.file === name) || {};
   const sourcePath = path.join(videosDirectory, name);
-  const fileInfo = await stat(sourcePath);
+  const fileInfo = await localFileInfo(sourcePath);
+  if (!fileInfo && !mediaBaseUrl) throw new Error(`Missing local video: ${name}`);
   const mediaName = publicMediaName(name);
   const mediaPath = `media/${mediaName}`;
-  const mediaUrl = `${siteUrl}/${mediaPath}`;
-  const title = name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
-  const publishedAt = publicationDate(path.relative(root, sourcePath), fileInfo.mtime);
+  const mediaUrl = mediaBaseUrl ? `${mediaBaseUrl}/${encodedPath(name)}` : `${siteUrl}/${mediaPath}`;
+  const title = configuredEpisode.title || name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
+  const publishedAt = configuredEpisode.publishedAt
+    ? new Date(configuredEpisode.publishedAt)
+    : publicationDate(path.relative(root, sourcePath), fileInfo?.mtime || new Date());
 
-  await copyFile(sourcePath, path.join(outputDirectory, 'media', mediaName));
+  if (!mediaBaseUrl) await copyFile(sourcePath, path.join(outputDirectory, 'media', mediaName));
   episodes.push({
-    number: name.match(/^(\d+)/)?.[1] ?? '',
+    number: configuredEpisode.number || name.match(/^(\d+)/)?.[1] || '',
     title,
     file: name,
-    url: encodedPath(mediaPath),
+    url: mediaBaseUrl ? mediaUrl : encodedPath(mediaPath),
   });
   items.push(`    <item>
       <title>${escapeXml(title)}</title>
       <guid isPermaLink="false">${escapeXml(mediaUrl)}</guid>
       <pubDate>${publishedAt.toUTCString()}</pubDate>
-      <enclosure url="${escapeXml(mediaUrl)}" length="${fileInfo.size}" type="video/mp4" />
+      <enclosure url="${escapeXml(mediaUrl)}" length="${fileInfo?.size || configuredEpisode.length || 0}" type="video/mp4" />
       <itunes:summary>${escapeXml(config.description)}</itunes:summary>
     </item>`);
 }
@@ -100,14 +118,21 @@ ${config.ownerName && config.ownerEmail ? `    <itunes:owner>
       <itunes:name>${escapeXml(config.ownerName)}</itunes:name>
       <itunes:email>${escapeXml(config.ownerEmail)}</itunes:email>
     </itunes:owner>` : ''}
-    <atom:link href="${escapeXml(`${siteUrl}/feed.xml`)}" rel="self" type="application/rss+xml" />
+    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />
 ${items.join('\n')}
   </channel>
 </rss>
 `;
 
 await writeFile(path.join(outputDirectory, 'feed.xml'), feed);
-await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
 await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
+await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
+  title: config.title,
+  description: config.description,
+  author: config.author,
+  artwork: 'artwork.jpg',
+  feed: feedUrl,
+}, null, 2));
+await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
 await copyFile(path.join(root, 'artwork.jpg'), path.join(outputDirectory, 'artwork.jpg'));
 console.log(`Generated ${items.length} episodes at ${path.join(outputDirectory, 'feed.xml')}`);

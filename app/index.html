@@ -3,12 +3,12 @@
 <head> 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Supply Chain Strategy</title>
+<title>Video Podcast</title>
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Supply Chain">
+<meta name="apple-mobile-web-app-title" content="Video Podcast">
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
 <meta name="googlebot" content="noindex, nofollow, noarchive, noimageindex">
 <link rel="manifest" href="manifest.webmanifest">
@@ -74,7 +74,8 @@
 </div>
 <script>
 (() => {
-  const KEY = 'scs-player-v1';
+  const KEY = `video-podcast-player-v1:${location.pathname}`;
+  const show = { title: 'Video Podcast', author: '', artwork: 'artwork.jpg' };
   const video = document.getElementById('video');
   const stage = document.getElementById('stage');
   const list = document.getElementById('list');
@@ -108,12 +109,18 @@
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
 
+  function applyShowMetadata(metadata) {
+    Object.assign(show, metadata || {});
+    document.title = show.title;
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
+  }
+
   function render() {
     list.innerHTML = '';
     episodes.forEach((ep, i) => {
       const li = document.createElement('li');
       li.dataset.i = i;
-      const img = Object.assign(document.createElement('img'), { src: 'artwork.jpg', alt: '', loading: 'lazy' });
+      const img = Object.assign(document.createElement('img'), { src: ep.artwork || show.artwork, alt: '', loading: 'lazy' });
       const name = document.createElement('div');
       name.className = 'name';
       name.innerHTML = '<span class="num"></span>';
@@ -133,10 +140,10 @@
     [...list.children].forEach((li, i) => li.classList.toggle('active', i === state.index));
     const ep = episodes[state.index];
     now.textContent = ep.number + ' ' + ep.title;
-    document.title = ep.title;
+    document.title = show.title ? `${ep.title} - ${show.title}` : ep.title;
     list.children[state.index]?.scrollIntoView({ block: 'nearest' });
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: ep.title, artist: 'Supply Chain Strategy', artwork: [{ src: 'artwork.jpg' }] });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: ep.title, artist: show.author || show.title, artwork: [{ src: ep.artwork || show.artwork }] });
     }
   }
 
@@ -205,7 +212,11 @@
     navigator.mediaSession.setActionHandler('seekforward', () => skip(10));
   }
 
-  fetch('episodes.json').then((r) => r.json()).then((data) => {
+  Promise.all([
+    fetch('site.json').then((r) => r.ok ? r.json() : {}).catch(() => ({})),
+    fetch('episodes.json').then((r) => r.json()),
+  ]).then(([metadata, data]) => {
+    applyShowMetadata(metadata);
     episodes = data;
     if (!episodes.length) return;
     if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;

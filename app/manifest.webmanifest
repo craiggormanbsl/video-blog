@@ -1,6 +1,6 @@
 {
-  "name": "Supply Chain Strategy",
-  "short_name": "Supply Chain",
+  "name": "Video Podcast",
+  "short_name": "Podcast",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
