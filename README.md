@@ -10,6 +10,8 @@ This repository builds a static video podcast web app and RSS feed. The app shel
 
 The workflow republishes when `main` changes. Add MP4 episodes to `videos/`; the feed is generated from that directory. Episode publication dates come from the latest Git commit for each video.
 
+The GitHub Pages workflow extracts a thumbnail from each local MP4 and uses it as the episode image in the app and RSS feed. Local builds do the same when `ffmpeg` is available; otherwise they fall back to the podcast artwork.
+
 By default, media files are copied into the generated site with hashed public file names. To keep the public app generic while serving protected media from another location, set `MEDIA_BASE_URL` when running `scripts/generate-feed.mjs`. Episode URLs and RSS enclosures will point at that media folder instead of copying videos into the published site.
 
 To generate a static feed file that will be saved somewhere else, such as a protected SharePoint folder, also set `FEED_URL` to the final URL of that copied `feed.xml` file.

@@ -36,6 +36,24 @@ function publicMediaName(fileName) {
   return `${hash}.mp4`;
 }
 
+function publicThumbnailName(fileName) {
+  const hash = createHash('sha256').update(fileName).digest('hex').slice(0, 16);
+  return `${hash}.jpg`;
+}
+
+function commandExists(command) {
+  try {
+    execFileSync(command, ['-version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function absoluteUrl(value) {
+  return /^https?:\/\//i.test(value) ? value : `${siteUrl}/${encodedPath(value)}`;
+}
+
 async function localFileInfo(filePath) {
   try {
     return await stat(filePath);
@@ -70,6 +88,8 @@ if (videoNames.length === 0) {
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 if (!mediaBaseUrl) await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
+const canGenerateThumbnails = commandExists('ffmpeg');
+if (canGenerateThumbnails) await mkdir(path.join(outputDirectory, 'thumbnails'), { recursive: true });
 
 const items = [];
 const episodes = [];
@@ -81,23 +101,37 @@ for (const name of videoNames) {
   const mediaName = publicMediaName(name);
   const mediaPath = `media/${mediaName}`;
   const mediaUrl = mediaBaseUrl ? `${mediaBaseUrl}/${encodedPath(name)}` : `${siteUrl}/${mediaPath}`;
+  const thumbnailPath = `thumbnails/${publicThumbnailName(name)}`;
+  const episodeArtwork = configuredEpisode.artwork || (fileInfo && canGenerateThumbnails ? thumbnailPath : 'artwork.jpg');
   const title = configuredEpisode.title || name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
   const publishedAt = configuredEpisode.publishedAt
     ? new Date(configuredEpisode.publishedAt)
     : publicationDate(path.relative(root, sourcePath), fileInfo?.mtime || new Date());
 
   if (!mediaBaseUrl) await copyFile(sourcePath, path.join(outputDirectory, 'media', mediaName));
+  if (!configuredEpisode.artwork && fileInfo && canGenerateThumbnails) {
+    execFileSync('ffmpeg', [
+      '-y',
+      '-ss', '00:00:05',
+      '-i', sourcePath,
+      '-frames:v', '1',
+      '-vf', 'scale=320:-1',
+      path.join(outputDirectory, thumbnailPath),
+    ], { stdio: 'ignore' });
+  }
   episodes.push({
     number: configuredEpisode.number || name.match(/^(\d+)/)?.[1] || '',
     title,
     file: name,
     url: mediaBaseUrl ? mediaUrl : encodedPath(mediaPath),
+    artwork: episodeArtwork,
   });
   items.push(`    <item>
       <title>${escapeXml(title)}</title>
       <guid isPermaLink="false">${escapeXml(mediaUrl)}</guid>
       <pubDate>${publishedAt.toUTCString()}</pubDate>
       <enclosure url="${escapeXml(mediaUrl)}" length="${fileInfo?.size || configuredEpisode.length || 0}" type="video/mp4" />
+      <itunes:image href="${escapeXml(absoluteUrl(episodeArtwork))}" />
       <itunes:summary>${escapeXml(config.description)}</itunes:summary>
     </item>`);
 }

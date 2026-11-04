@@ -28,6 +28,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install thumbnail tooling
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5
