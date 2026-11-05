@@ -18,13 +18,15 @@
     section { margin-top: 20px; padding: 16px; border: 1px solid #30363d; border-radius: 10px; background: #11161c; }
     label { display: block; margin: 12px 0 6px; font-size: .9rem; font-weight: 600; }
     input[type="url"] { width: 100%; min-height: 44px; padding: 9px 10px; border: 1px solid #555; border-radius: 6px; background: #080a0d; color: #fff; font: inherit; overflow-wrap: anywhere; }
+    textarea { width: 100%; min-height: 110px; padding: 9px 10px; border: 1px solid #555; border-radius: 6px; background: #080a0d; color: #fff; font: inherit; overflow-wrap: anywhere; }
     button { min-height: 42px; margin-top: 10px; padding: 8px 14px; border: 0; border-radius: 6px; background: #1f6feb; color: white; font: inherit; font-weight: 650; }
-    button:focus-visible, input:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
     output { display: block; min-height: 24px; margin-top: 12px; color: #d2dbe5; overflow-wrap: anywhere; }
     .hint { margin-bottom: 0; font-size: .88rem; color: #9da7b2; }
     .open-link { display: inline-block; margin-top: 10px; }
     .preview { display: block; max-width: 100%; max-height: 55vh; margin-top: 12px; object-fit: contain; background: #050608; }
     video { display: block; width: 100%; max-height: 55vh; margin-top: 12px; background: #050608; }
+    #embed-preview { display: block; width: 100%; height: min(56.25vw, 405px); min-height: 220px; margin-top: 12px; border: 0; background: #050608; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -45,6 +47,22 @@
       <a id="open-image-link" class="open-link" target="_blank" rel="noopener noreferrer" hidden>Open this image URL in SharePoint (sign in if prompted)</a>
       <img id="image-preview" class="preview" alt="SharePoint image preview" hidden>
       <p class="hint">If loading fails, open the URL in SharePoint, complete sign-in if prompted, return here, and try again. A failure can still mean third-party cookies are blocked, the URL returns a SharePoint viewer instead of image bytes, or access/network policy prevents embedding.</p>
+    </section>
+
+    <section aria-labelledby="embed-heading">
+      <h2 id="embed-heading">SharePoint Stream embed test</h2>
+      <form id="embed-form">
+        <label for="embed-code">Paste the SharePoint iframe code or its src URL</label>
+        <textarea id="embed-code" autocomplete="off" placeholder="&lt;iframe src=&quot;https://tenant.sharepoint.com/sites/.../_layouts/15/embed.aspx?...&quot;&gt;&lt;/iframe&gt;"></textarea>
+        <button type="submit">Load embed</button>
+      </form>
+      <output id="embed-status" aria-live="polite"></output>
+      <a id="open-embed-link" class="open-link" target="_blank" rel="noopener noreferrer" hidden>Open SharePoint embed in a new tab to sign in</a>
+      <div>
+        <button id="retry-embed" type="button" hidden>Retry embed</button>
+      </div>
+      <iframe id="embed-preview" title="SharePoint Stream video embed" allow="autoplay; picture-in-picture; encrypted-media" allowfullscreen hidden></iframe>
+      <p class="hint">This test does not change the main player. If the embed needs authentication, open it in a new tab, sign in there, return here, and tap Retry embed. The browser may still block sign-in inside an embedded frame.</p>
     </section>
 
     <section aria-labelledby="video-heading">
@@ -86,6 +104,63 @@
     imagePreview.addEventListener('error', () => {
       imagePreview.hidden = true;
       imageStatus.textContent = 'Image did not load. Check the URL and whether this browser is signed in; the page cannot read SharePoint’s HTTP response details.';
+    });
+
+    const embedForm = document.getElementById('embed-form');
+    const embedCode = document.getElementById('embed-code');
+    const embedStatus = document.getElementById('embed-status');
+    const embedPreview = document.getElementById('embed-preview');
+    const openEmbedLink = document.getElementById('open-embed-link');
+    const retryEmbed = document.getElementById('retry-embed');
+    let activeEmbedUrl = '';
+
+    function readEmbedUrl(value) {
+      const input = value.trim();
+      const iframeSource = new DOMParser().parseFromString(input, 'text/html').querySelector('iframe')?.getAttribute('src');
+      const url = new URL(iframeSource || input);
+      if (url.protocol !== 'https:' || (url.hostname !== 'sharepoint.com' && !url.hostname.toLowerCase().endsWith('.sharepoint.com'))) {
+        throw new Error('Use an HTTPS SharePoint embed URL.');
+      }
+      return url.href;
+    }
+
+    embedForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      try {
+        activeEmbedUrl = readEmbedUrl(embedCode.value);
+      } catch (error) {
+        activeEmbedUrl = '';
+        embedPreview.hidden = true;
+        openEmbedLink.hidden = true;
+        retryEmbed.hidden = true;
+        embedStatus.textContent = error instanceof TypeError ? 'Enter a valid SharePoint embed URL or iframe code.' : error.message;
+        return;
+      }
+      openEmbedLink.href = activeEmbedUrl;
+      openEmbedLink.hidden = false;
+      retryEmbed.hidden = false;
+      embedPreview.hidden = false;
+      embedStatus.textContent = 'Loading SharePoint embed…';
+      embedPreview.src = activeEmbedUrl;
+    });
+
+    openEmbedLink.addEventListener('click', () => {
+      embedStatus.textContent = 'Opened the SharePoint embed in a new tab. Complete sign-in there, return here, then tap Retry embed.';
+    });
+
+    retryEmbed.addEventListener('click', () => {
+      if (!activeEmbedUrl) return;
+      embedStatus.textContent = 'Reloading the SharePoint embed…';
+      embedPreview.src = 'about:blank';
+      window.setTimeout(() => {
+        embedPreview.src = activeEmbedUrl;
+      }, 100);
+    });
+
+    embedPreview.addEventListener('load', () => {
+      if (!embedPreview.hidden && activeEmbedUrl) {
+        embedStatus.textContent = 'The embed frame loaded. Check whether the video appears or SharePoint asks you to sign in.';
+      }
     });
 
     const videoForm = document.getElementById('video-form');
