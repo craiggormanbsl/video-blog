@@ -16,23 +16,19 @@
 <link rel="icon" href="artwork.jpg">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
   #app.hub-view #playerbar, #app.hub-view #stage, #app.hub-view #now, #app.hub-view #controls, #app.hub-view #list { display: none; }
   #app.player-view #hub { display: none; }
-  #hub { flex: 0 0 auto; padding: 12px; background: #151515; border-bottom: 1px solid #292929; display: grid; gap: 10px; }
-  #hub-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  #hub-title img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
-  #hub-title h1 { margin: 0; font-size: 18px; line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #hub-title p { margin: 3px 0 0; color: #aaa; font-size: 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #blogs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; overscroll-behavior-x: contain; }
-  #blogs button { min-width: min(320px, 82vw); border: 1px solid #30363d; border-radius: 8px; padding: 10px; background: #0d1117; color: #fff; display: grid; grid-template-columns: 38px 1fr auto; gap: 9px; align-items: center; text-align: left; cursor: pointer; }
-  #blogs button.active { border-color: #58a6ff; background: #101a27; }
-  #blogs img { width: 38px; height: 38px; border-radius: 7px; object-fit: cover; }
-  #blogs .blog-name { display: block; font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #blogs .blog-desc { display: block; margin-top: 2px; color: #9aa4af; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #blogs a { color: #58a6ff; font-size: 11px; font-weight: 700; text-decoration: none; padding: 6px; border-radius: 6px; }
-  #blogs a:active { background: rgba(88,166,255,.14); }
+  #hub { flex: 1 1 auto; min-height: 0; background: #0a0a0a; display: flex; flex-direction: column; overflow: hidden; }
+  #hub-title { flex: 0 0 auto; height: 44px; padding: 0 14px; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; background: #000; border-bottom: 1px solid #111; }
+  #hub-title img, #hub-title p { display: none; }
+  #hub-title h1 { margin: 0; min-width: 0; color: #d7d7d7; font-size: 15px; line-height: 1; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  #blogs { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 22px; overflow-x: hidden; overflow-y: auto; padding: 34px 18px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  #blogs button { width: min(100%, 320px); border: 0; border-radius: 0; padding: 0; background: transparent; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; cursor: pointer; }
+  #blogs button.active { color: #fff; }
+  #blogs img { width: min(68vw, 220px); max-width: 100%; aspect-ratio: 1; height: auto; border-radius: 12px; object-fit: cover; box-shadow: 0 18px 48px rgba(0,0,0,.38); }
+  #blogs .blog-name { display: block; max-width: 100%; font-size: 20px; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
   #playerbar { flex: 0 0 auto; height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 6px; background: #000; border-bottom: 1px solid #070707; overflow: hidden; white-space: nowrap; }
   #back-to-hub { flex: 0 0 auto; max-width: 78px; height: 36px; border: 0; border-radius: 8px; padding: 0 7px 0 2px; background: transparent; color: #0a84ff; font: inherit; font-size: 17px; display: inline-flex; align-items: center; gap: 1px; overflow: hidden; white-space: nowrap; cursor: pointer; }
   #back-to-hub:active { background: rgba(10,132,255,.12); }
@@ -76,7 +72,7 @@
     <div id="hub-title">
       <img id="hub-art" src="artwork.jpg" alt="">
       <div>
-        <h1 id="hub-name">Video Blogs</h1>
+          <h1 id="hub-name">Video Library</h1>
         <p id="hub-desc">SharePoint-backed RSS video feeds</p>
       </div>
     </div>
@@ -178,7 +174,7 @@
   function applyShowMetadata(metadata) {
     Object.assign(show, metadata || {});
     document.title = show.title;
-    hubName.textContent = show.title;
+    hubName.textContent = 'Video Library';
     hubDesc.textContent = show.description || 'SharePoint-backed RSS video feeds';
     hubArt.src = show.artwork || 'artwork.jpg';
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
@@ -191,14 +187,12 @@
       button.type = 'button';
       button.className = i === activeBlog ? 'active' : '';
       button.setAttribute('role', 'listitem');
+      button.setAttribute('aria-label', 'Open ' + blog.title);
       const img = Object.assign(document.createElement('img'), { src: blog.artwork || show.artwork, alt: '', loading: 'lazy' });
       const label = document.createElement('span');
-      label.innerHTML = '<span class="blog-name"></span><span class="blog-desc"></span>';
-      label.querySelector('.blog-name').textContent = blog.title;
-      label.querySelector('.blog-desc').textContent = blog.description || '';
-      const feed = Object.assign(document.createElement('a'), { href: blog.feed || 'feed.xml', textContent: 'RSS', target: '_blank', rel: 'noopener' });
-      feed.addEventListener('click', (event) => event.stopPropagation());
-      button.append(img, label, feed);
+      label.className = 'blog-name';
+      label.textContent = blog.title;
+      button.append(img, label);
       button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
       blogsList.append(button);
     });
