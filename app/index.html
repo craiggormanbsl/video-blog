@@ -18,7 +18,7 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-  #app.hub-view #playerbar, #app.hub-view #stage, #app.hub-view #now, #app.hub-view #controls, #app.hub-view #list { display: none; }
+  #app.hub-view #playerbar, #app.hub-view #stage, #app.hub-view #now, #app.hub-view #media-auth, #app.hub-view #controls, #app.hub-view #list { display: none; }
   #app.player-view #hub { display: none; }
   #hub { flex: 1 1 auto; min-height: 0; background: #0a0a0a; display: flex; flex-direction: column; overflow: hidden; }
   #hub-title { flex: 0 0 auto; height: 44px; padding: 0 14px; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap; background: #000; border-bottom: 1px solid #111; }
@@ -38,6 +38,8 @@
   #back-to-hub span:first-child { flex: 0 0 auto; font-size: 30px; line-height: 1; margin-top: -2px; }
   #back-to-hub span:last-child { min-width: 0; overflow: hidden; text-overflow: clip; }
   #player-title { flex: 1 1 auto; min-width: 0; text-align: center; margin-right: 52px; color: #aaa; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  #media-auth { flex: 0 0 auto; padding: 8px 12px; background: #221b12; color: #f0d7a3; font-size: 12px; line-height: 1.4; }
+  #media-auth a { display: inline-block; margin-top: 3px; color: #79c0ff; }
   #stage { position: relative; flex: 0 0 auto; height: min(34dvh, 56.25vw); min-height: 120px; background: #000; cursor: pointer; user-select: none; -webkit-user-select: none; }
   #stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
   #badge { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; transition: opacity .2s; }
@@ -92,6 +94,10 @@
     <div id="badge"><span>&#9654;</span></div>
   </div>
   <div id="now"></div>
+  <div id="media-auth" role="status" hidden>
+    <span id="media-auth-message">This video could not be loaded.</span>
+    <a id="sharepoint-auth-link" target="_blank" rel="noopener noreferrer" hidden>Open in SharePoint to sign in</a>
+  </div>
   <div id="controls">
     <div id="seek">
       <span id="elapsed">0:00</span>
@@ -119,6 +125,9 @@
   const blogsList = document.getElementById('blogs');
   const hub = document.getElementById('hub');
   const playerTitle = document.getElementById('player-title');
+  const mediaAuth = document.getElementById('media-auth');
+  const mediaAuthMessage = document.getElementById('media-auth-message');
+  const sharePointAuthLink = document.getElementById('sharepoint-auth-link');
   const hubName = document.getElementById('hub-name');
   const hubDesc = document.getElementById('hub-desc');
   const hubArt = document.getElementById('hub-art');
@@ -150,6 +159,8 @@
   let activeBlog = 0;
   let state = { blog: 0, index: 0, browseIndex: 0, times: {}, view: 'hub' };
   let lastSave = 0;
+  let retryAfterSharePointAuth = false;
+  let leftPlayerForSharePoint = false;
 
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
@@ -311,6 +322,9 @@
     if (i < 0 || i >= episodes.length) return;
     if (i !== state.index || !video.src) {
       rememberCurrentTime();
+      mediaAuth.hidden = true;
+      sharePointAuthLink.hidden = true;
+      retryAfterSharePointAuth = false;
       state.index = i;
       state.browseIndex = i;
       const resume = state.times[episodeKey(episodes[i])] || 0;
@@ -334,6 +348,8 @@
     rememberCurrentTime();
     activeBlog = i;
     state.blog = i;
+    mediaAuth.hidden = true;
+    retryAfterSharePointAuth = false;
     if (!options.restore) {
       state.index = 0;
       state.browseIndex = 0;
@@ -355,6 +371,54 @@
   }
 
   document.getElementById('back-to-hub').addEventListener('click', showHub);
+  sharePointAuthLink.addEventListener('click', () => {
+    retryAfterSharePointAuth = true;
+    leftPlayerForSharePoint = false;
+    mediaAuthMessage.textContent = 'Complete SharePoint sign-in in the new tab, then return here. The video will reload; tap Play to resume.';
+  });
+  window.addEventListener('blur', () => {
+    if (retryAfterSharePointAuth) leftPlayerForSharePoint = true;
+  });
+  function retryAfterReturningFromSharePoint() {
+    if (!retryAfterSharePointAuth || !leftPlayerForSharePoint || document.visibilityState === 'hidden') return;
+    retryAfterSharePointAuth = false;
+    leftPlayerForSharePoint = false;
+    const resumeAt = video.currentTime;
+    mediaAuthMessage.textContent = 'Retrying video...';
+    sharePointAuthLink.hidden = true;
+    if (resumeAt > 0) {
+      video.addEventListener('loadedmetadata', () => {
+        if (resumeAt < video.duration - 2) video.currentTime = resumeAt;
+      }, { once: true });
+    }
+    video.load();
+  }
+  window.addEventListener('focus', retryAfterReturningFromSharePoint);
+  window.addEventListener('pageshow', retryAfterReturningFromSharePoint);
+  document.addEventListener('visibilitychange', () => {
+    if (retryAfterSharePointAuth && document.visibilityState === 'hidden') leftPlayerForSharePoint = true;
+    else retryAfterReturningFromSharePoint();
+  });
+  video.addEventListener('error', () => {
+    if (!video.error || video.error.code === 1) return;
+    const episode = episodes[state.index];
+    if (!episode?.url) return;
+    mediaAuth.hidden = false;
+    mediaAuthMessage.textContent = 'This video could not be loaded. If SharePoint sign-in is required, open the file, sign in, and return here to retry.';
+    try {
+      const mediaUrl = new URL(episode.url, location.href);
+      const host = mediaUrl.hostname.toLowerCase();
+      sharePointAuthLink.hidden = host !== 'sharepoint.com' && !host.endsWith('.sharepoint.com');
+      if (!sharePointAuthLink.hidden) sharePointAuthLink.href = mediaUrl.href;
+    } catch (error) {
+      sharePointAuthLink.hidden = true;
+      console.error('Could not create SharePoint sign-in link for the current episode.', error);
+    }
+  });
+  video.addEventListener('loadedmetadata', () => {
+    mediaAuth.hidden = true;
+    sharePointAuthLink.hidden = true;
+  });
   stage.addEventListener('click', togglePlay);
   document.getElementById('toggle').addEventListener('click', togglePlay);
   document.getElementById('back').addEventListener('click', () => skip(-10));
