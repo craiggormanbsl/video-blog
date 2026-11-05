@@ -13,6 +13,7 @@ const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
 const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
 const accessCheckUrl = (process.env.ACCESS_CHECK_URL || config.accessCheckUrl || feedUrl).replace(/\/$/, '');
+const artworkUrl = absoluteUrl(config.image || 'artwork.jpg');
 
 if (!siteUrl) {
   throw new Error('Set SITE_URL to the public HTTPS URL for this GitHub Pages site.');
@@ -103,7 +104,7 @@ for (const name of videoNames) {
   const mediaPath = `media/${mediaName}`;
   const mediaUrl = mediaBaseUrl ? `${mediaBaseUrl}/${encodedPath(name)}` : `${siteUrl}/${mediaPath}`;
   const thumbnailPath = `thumbnails/${publicThumbnailName(name)}`;
-  const episodeArtwork = configuredEpisode.artwork || (fileInfo && canGenerateThumbnails ? thumbnailPath : 'artwork.jpg');
+  const episodeArtwork = configuredEpisode.artwork || (fileInfo && canGenerateThumbnails ? thumbnailPath : artworkUrl);
   const title = configuredEpisode.title || name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
   const publishedAt = configuredEpisode.publishedAt
     ? new Date(configuredEpisode.publishedAt)
@@ -149,7 +150,7 @@ const feed = `<?xml version="1.0" encoding="UTF-8"?>
     <itunes:category text="${escapeXml(config.category)}">
       <itunes:category text="${escapeXml(config.subcategory)}" />
     </itunes:category>
-    <itunes:image href="${escapeXml(`${siteUrl}/artwork.jpg`)}" />
+    <itunes:image href="${escapeXml(artworkUrl)}" />
 ${config.ownerName && config.ownerEmail ? `    <itunes:owner>
       <itunes:name>${escapeXml(config.ownerName)}</itunes:name>
       <itunes:email>${escapeXml(config.ownerEmail)}</itunes:email>
@@ -166,7 +167,7 @@ await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
   title: config.siteTitle || 'SharePoint Video Blogs',
   description: config.siteDescription || 'Video feeds published from SharePoint-backed media libraries.',
   author: config.author,
-  artwork: 'artwork.jpg',
+  artwork: artworkUrl,
   feed: feedUrl,
   accessCheckUrl,
 }, null, 2));
@@ -174,7 +175,7 @@ await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.
   title: config.title,
   description: config.description,
   author: config.author,
-  artwork: 'artwork.jpg',
+  artwork: artworkUrl,
   feed: feedUrl,
   accessCheckUrl,
   episodes: 'episodes.json',
