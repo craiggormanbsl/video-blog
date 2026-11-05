@@ -57,13 +57,14 @@
   #buttons #toggle .i-pause, #controls.playing #toggle .i-play { display: none; }
   #controls.playing #toggle .i-pause { display: inline; }
   #list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; background: #0b0b0b; }
-  #list li { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid #1c1c1c; }
+  #list li { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid #1c1c1c; cursor: pointer; }
   #list li.active { background: #162536; }
+  #list li:focus { outline: 2px solid #58a6ff; outline-offset: -2px; }
   #list img { width: 28px; height: 28px; border-radius: 5px; object-fit: cover; flex: 0 0 auto; }
   #list .name { flex: 1 1 auto; min-width: 0; font-size: 14px; line-height: 1.25; }
   #list .num { color: #8a8a8a; margin-right: 6px; }
   #list button { flex: 0 0 auto; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #1f6feb; color: #fff; font-size: 14px; cursor: pointer; }
-  #list li.active button { background: #2ea043; }
+  #list li.playing button { background: #2ea043; }
 </style>
 </head>
 <body>
@@ -142,7 +143,7 @@
   let episodes = [];
   let blogs = [];
   let activeBlog = 0;
-  let state = { blog: 0, index: 0, times: {}, view: 'hub' };
+  let state = { blog: 0, index: 0, browseIndex: 0, times: {}, view: 'hub' };
   let lastSave = 0;
 
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
@@ -154,6 +155,16 @@
 
   function rememberCurrentTime() {
     if (episodes[state.index] && video.src && !video.ended) state.times[episodeKey(episodes[state.index])] = video.currentTime;
+  }
+
+  function browse(i, focusRow = false) {
+    if (i < 0 || i >= episodes.length) return;
+    state.browseIndex = i;
+    mark();
+    save();
+    const row = list.children[i];
+    row?.scrollIntoView({ block: 'nearest' });
+    if (focusRow) row?.focus({ preventScroll: true });
   }
 
   function showHub() {
@@ -203,6 +214,9 @@
     episodes.forEach((ep, i) => {
       const li = document.createElement('li');
       li.dataset.i = i;
+      li.tabIndex = 0;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-label', ep.number + ' ' + ep.title);
       const img = Object.assign(document.createElement('img'), { src: ep.artwork || show.artwork, alt: '', loading: 'lazy' });
       const name = document.createElement('div');
       name.className = 'name';
@@ -213,19 +227,33 @@
       btn.type = 'button';
       btn.textContent = '\u25B6';
       btn.setAttribute('aria-label', 'Play ' + ep.title);
-      btn.addEventListener('click', () => select(i, true));
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        select(i, true);
+      });
       li.append(img, name, btn);
+      li.addEventListener('click', () => browse(i));
+      li.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') { event.preventDefault(); browse(Math.min(episodes.length - 1, i + 1), true); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); browse(Math.max(0, i - 1), true); }
+        else if (event.key === 'Home') { event.preventDefault(); browse(0, true); }
+        else if (event.key === 'End') { event.preventDefault(); browse(episodes.length - 1, true); }
+      });
       list.append(li);
     });
   }
 
   function mark() {
-    [...list.children].forEach((li, i) => li.classList.toggle('active', i === state.index));
+    [...list.children].forEach((li, i) => {
+      li.classList.toggle('active', i === state.browseIndex);
+      li.classList.toggle('playing', i === state.index);
+      li.setAttribute('aria-selected', String(i === state.browseIndex));
+    });
     const ep = episodes[state.index];
     now.textContent = ep.number + ' ' + ep.title;
     playerTitle.textContent = show.title;
     document.title = show.title ? `${ep.title} - ${show.title}` : ep.title;
-    list.children[state.index]?.scrollIntoView({ block: 'nearest' });
+    list.children[state.browseIndex]?.scrollIntoView({ block: 'nearest' });
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({ title: ep.title, artist: show.author || show.title, artwork: [{ src: ep.artwork || show.artwork }] });
     }
@@ -236,6 +264,7 @@
     if (i !== state.index || !video.src) {
       rememberCurrentTime();
       state.index = i;
+      state.browseIndex = i;
       const resume = state.times[episodeKey(episodes[i])] || 0;
       video.src = episodes[i].url;
       video.addEventListener('loadedmetadata', () => {
@@ -244,6 +273,7 @@
     } else if (autoplay && video.ended) {
       video.currentTime = 0;
     }
+    if (autoplay) state.browseIndex = i;
     mark();
     save();
     document.getElementById('next').disabled = state.index + 1 >= episodes.length;
@@ -256,7 +286,10 @@
     rememberCurrentTime();
     activeBlog = i;
     state.blog = i;
-    if (!options.restore) state.index = 0;
+    if (!options.restore) {
+      state.index = 0;
+      state.browseIndex = 0;
+    }
     video.pause();
     video.removeAttribute('src');
     video.load();
@@ -266,6 +299,7 @@
     return fetch(blog.episodes || 'episodes.json').then((r) => r.json()).then((data) => {
       episodes = data;
       if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;
+      if (!(state.browseIndex >= 0 && state.browseIndex < episodes.length)) state.browseIndex = state.index;
       render();
       if (episodes.length) select(state.index, false);
       if (options.openPlayer) showPlayer();
