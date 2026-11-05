@@ -22,6 +22,7 @@
     button:focus-visible, input:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
     output { display: block; min-height: 24px; margin-top: 12px; color: #d2dbe5; overflow-wrap: anywhere; }
     .hint { margin-bottom: 0; font-size: .88rem; color: #9da7b2; }
+    .open-link { display: inline-block; margin-top: 10px; }
     .preview { display: block; max-width: 100%; max-height: 55vh; margin-top: 12px; object-fit: contain; background: #050608; }
     video { display: block; width: 100%; max-height: 55vh; margin-top: 12px; background: #050608; }
     [hidden] { display: none !important; }
@@ -41,8 +42,9 @@
         <button type="submit">Load image</button>
       </form>
       <output id="image-status" aria-live="polite"></output>
+      <a id="open-image-link" class="open-link" target="_blank" rel="noopener noreferrer" hidden>Open this image URL in SharePoint (sign in if prompted)</a>
       <img id="image-preview" class="preview" alt="SharePoint image preview" hidden>
-      <p class="hint">A successful load confirms this browser can display this image URL in the page. A failure is not definitive proof of an auth problem: the browser intentionally hides cross-site HTTP status, and blocked cookies, redirects, permissions, network policy, or an invalid URL can look similar.</p>
+      <p class="hint">If loading fails, open the URL in SharePoint, complete sign-in if prompted, return here, and try again. A failure can still mean third-party cookies are blocked, the URL returns a SharePoint viewer instead of image bytes, or access/network policy prevents embedding.</p>
     </section>
 
     <section aria-labelledby="video-heading">
@@ -53,8 +55,9 @@
         <button type="submit">Check video</button>
       </form>
       <output id="video-status" aria-live="polite"></output>
+      <a id="open-video-link" class="open-link" target="_blank" rel="noopener noreferrer" hidden>Open this video URL in SharePoint (sign in if prompted)</a>
       <video id="video-preview" controls playsinline preload="metadata" hidden></video>
-      <p class="hint">This requests video metadata first, not the entire file. If metadata loads but playback buffers or fails, file size/network throughput may contribute; codec support, SharePoint auth, or byte-range streaming can also be involved. The page cannot identify the exact cause on its own.</p>
+      <p class="hint">This requests video metadata first, not the entire file. If loading fails, open the URL in SharePoint, complete sign-in if prompted, return here, and retry. If metadata loads but playback buffers or fails, file size/network throughput, codec support, or byte-range streaming may be involved.</p>
     </section>
   </main>
   <script>
@@ -62,10 +65,13 @@
     const imageUrl = document.getElementById('image-url');
     const imagePreview = document.getElementById('image-preview');
     const imageStatus = document.getElementById('image-status');
+    const openImageLink = document.getElementById('open-image-link');
     let imageStartedAt = 0;
 
     imageForm.addEventListener('submit', (event) => {
       event.preventDefault();
+      openImageLink.href = imageUrl.value.trim();
+      openImageLink.hidden = false;
       imagePreview.hidden = true;
       imagePreview.removeAttribute('src');
       imageStatus.textContent = 'Loading image…';
@@ -86,6 +92,7 @@
     const videoUrl = document.getElementById('video-url');
     const videoPreview = document.getElementById('video-preview');
     const videoStatus = document.getElementById('video-status');
+    const openVideoLink = document.getElementById('open-video-link');
     let videoStartedAt = 0;
 
     videoForm.addEventListener('submit', (event) => {
@@ -94,6 +101,8 @@
         videoStatus.textContent = 'Enter a direct MP4 URL to test.';
         return;
       }
+      openVideoLink.href = videoUrl.value.trim();
+      openVideoLink.hidden = false;
       videoPreview.pause();
       videoPreview.hidden = true;
       videoPreview.removeAttribute('src');
