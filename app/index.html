@@ -217,13 +217,34 @@
 
   async function canAccessBlog(blog) {
     const url = blog.accessCheckUrl || blog.feed;
-    if (!url) return true;
+    const fallbackImage = blog.artwork && /^https?:\/\//i.test(blog.artwork) ? blog.artwork : '';
+    if (!url && !fallbackImage) return true;
     try {
       const response = await fetch(url, { cache: 'no-store', credentials: 'include' });
       return response.ok;
     } catch {
+      if (fallbackImage && await canLoadImage(fallbackImage)) return true;
+      return canReachOpaque(url);
+    }
+  }
+
+  async function canReachOpaque(url) {
+    if (!url) return false;
+    try {
+      const response = await fetch(url, { cache: 'no-store', credentials: 'include', mode: 'no-cors' });
+      return response.type === 'opaque';
+    } catch {
       return false;
     }
+  }
+
+  function canLoadImage(url) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = `${url}${url.includes('?') ? '&' : '?'}access-check=${Date.now()}`;
+    });
   }
 
   function render() {
