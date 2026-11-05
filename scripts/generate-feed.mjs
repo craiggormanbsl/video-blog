@@ -12,6 +12,7 @@ const config = JSON.parse(await readFile(configPath, 'utf8'));
 const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
 const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
+const accessCheckUrl = (process.env.ACCESS_CHECK_URL || config.accessCheckUrl || feedUrl).replace(/\/$/, '');
 
 if (!siteUrl) {
   throw new Error('Set SITE_URL to the public HTTPS URL for this GitHub Pages site.');
@@ -167,6 +168,7 @@ await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
   author: config.author,
   artwork: 'artwork.jpg',
   feed: feedUrl,
+  accessCheckUrl,
 }, null, 2));
 await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.blogs || [{
   title: config.title,
@@ -174,6 +176,7 @@ await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.
   author: config.author,
   artwork: 'artwork.jpg',
   feed: feedUrl,
+  accessCheckUrl,
   episodes: 'episodes.json',
 }], null, 2));
 await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));

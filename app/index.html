@@ -29,6 +29,9 @@
   #blogs button.active { color: #fff; }
   #blogs img { width: min(68vw, 220px); max-width: 100%; aspect-ratio: 1; height: auto; border-radius: 12px; object-fit: cover; box-shadow: 0 18px 48px rgba(0,0,0,.38); }
   #blogs .blog-name { display: block; max-width: 100%; font-size: 20px; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+  #empty { display: none; flex: 1 1 auto; min-height: 0; place-items: center; padding: 24px; text-align: center; color: #c9d1d9; font-size: 20px; font-weight: 700; }
+  #hub.empty #blogs { display: none; }
+  #hub.empty #empty { display: grid; }
   #playerbar { flex: 0 0 auto; height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 6px; background: #000; border-bottom: 1px solid #070707; overflow: hidden; white-space: nowrap; }
   #back-to-hub { flex: 0 0 auto; max-width: 78px; height: 36px; border: 0; border-radius: 8px; padding: 0 7px 0 2px; background: transparent; color: #0a84ff; font: inherit; font-size: 17px; display: inline-flex; align-items: center; gap: 1px; overflow: hidden; white-space: nowrap; cursor: pointer; }
   #back-to-hub:active { background: rgba(10,132,255,.12); }
@@ -78,6 +81,7 @@
       </div>
     </div>
     <div id="blogs" role="list"></div>
+    <div id="empty" role="status">No Videos Available</div>
   </section>
   <header id="playerbar">
     <button id="back-to-hub" type="button" aria-label="Back to video blogs"><span aria-hidden="true">&#8249;</span><span>Back</span></button>
@@ -113,6 +117,7 @@
   const stage = document.getElementById('stage');
   const list = document.getElementById('list');
   const blogsList = document.getElementById('blogs');
+  const hub = document.getElementById('hub');
   const playerTitle = document.getElementById('player-title');
   const hubName = document.getElementById('hub-name');
   const hubDesc = document.getElementById('hub-desc');
@@ -193,6 +198,7 @@
 
   function renderBlogs() {
     blogsList.innerHTML = '';
+    hub.classList.toggle('empty', blogs.length === 0);
     blogs.forEach((blog, i) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -207,6 +213,17 @@
       button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
       blogsList.append(button);
     });
+  }
+
+  async function canAccessBlog(blog) {
+    const url = blog.accessCheckUrl || blog.feed;
+    if (!url) return true;
+    try {
+      const response = await fetch(url, { cache: 'no-store', credentials: 'include' });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   function render() {
@@ -360,8 +377,16 @@
     fetch('blogs.json').then((r) => r.ok ? r.json() : []).catch(() => []),
   ]).then(([metadata, data]) => {
     applyShowMetadata(metadata);
-    blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.jpg', feed: metadata.feed || 'feed.xml', episodes: 'episodes.json' }];
+    blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.jpg', feed: metadata.feed || 'feed.xml', accessCheckUrl: metadata.accessCheckUrl || metadata.feed || 'feed.xml', episodes: 'episodes.json' }];
+    return Promise.all(blogs.map(async (blog) => ({ blog, accessible: await canAccessBlog(blog) }))).then((results) => {
+      blogs = results.filter((result) => result.accessible).map((result) => result.blog);
+      if (state.blog >= blogs.length) state.blog = 0;
+      if (activeBlog >= blogs.length) activeBlog = 0;
+      return metadata;
+    });
+  }).then(() => {
     renderBlogs();
+    if (!blogs.length) return;
     const restorePlayer = state.view === 'player';
     const blogToLoad = restorePlayer && state.blog >= 0 && state.blog < blogs.length ? state.blog : 0;
     loadBlog(blogToLoad, { restore: restorePlayer, openPlayer: restorePlayer });
