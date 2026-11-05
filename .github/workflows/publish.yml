@@ -30,6 +30,17 @@ jobs:
           node-version: 22
       - name: Install thumbnail tooling
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Load private podcast configuration
+        env:
+          PODCAST_CONFIG_JSON: ${{ secrets.PODCAST_CONFIG_JSON }}
+        run: |
+          if [ -z "$PODCAST_CONFIG_JSON" ]; then
+            echo "::error::Set the PODCAST_CONFIG_JSON Actions secret to the podcast configuration JSON."
+            exit 1
+          fi
+          printf '%s' "$PODCAST_CONFIG_JSON" > "$RUNNER_TEMP/podcast.json"
+          node -e "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'))" "$RUNNER_TEMP/podcast.json"
+          echo "PODCAST_CONFIG=$RUNNER_TEMP/podcast.json" >> "$GITHUB_ENV"
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@v5

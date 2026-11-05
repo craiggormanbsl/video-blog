@@ -1,6 +1,6 @@
 # Static video podcast app
 
-This repository builds a static video podcast web app and RSS feed. The app shell is generic; podcast-specific title, author, artwork, episodes, and feed details come from `podcast.json` and the generated JSON files.
+This repository builds a static video podcast web app and RSS feed. The app shell is generic; podcast-specific title, author, artwork, episodes, and feed details come from a build-time JSON configuration and the generated JSON files.
 
 ## Publish
 
@@ -10,6 +10,8 @@ This repository builds a static video podcast web app and RSS feed. The app shel
 
 The workflow republishes when `main` changes. For a fully public podcast, add MP4 episodes to `videos/`; the feed is generated from that directory. For a podcast hosted by an external media service, keep MP4 files out of the repository and list episodes in the podcast config instead.
 
+For GitHub Actions publishing, add the complete podcast configuration JSON as the repository Actions secret `PODCAST_CONFIG_JSON` (**Settings > Secrets and variables > Actions**). The workflow writes it to the runner's temporary directory for the build; the config is not included in the repository or Pages artifact. Values needed by the public player or RSS feed, such as episode titles and media URLs, are still included in the generated public files.
+
 When local MP4 files are present, the GitHub Pages workflow extracts a thumbnail from each file and uses it as the episode image in the app and RSS feed. Local builds do the same when `ffmpeg` is available; otherwise they fall back to the podcast artwork.
 
 By default, media files are copied into the generated site with hashed public file names. To serve media from an external host instead, set `MEDIA_BASE_URL` when running `scripts/generate-feed.mjs` or set `mediaBaseUrl` in the podcast config. Episode URLs and RSS enclosures will point at that media folder instead of copying videos into the published site.
@@ -18,10 +20,10 @@ To generate a static feed file that will be saved somewhere else, set `FEED_URL`
 
 ## Podcast details
 
-Edit `podcast.json` to set the show title, description, author, language, category, explicit-content flag, artwork, and optional owner contact details. To build a different podcast from another config file, set `PODCAST_CONFIG`:
+For local builds, keep the configuration in an ignored `podcast.private.json` file and set `PODCAST_CONFIG` to that path. Set `SITE_URL` as well:
 
 ```powershell
-$env:PODCAST_CONFIG='podcasts/example.external-media.json'
+$env:PODCAST_CONFIG='podcast.private.json'
 $env:SITE_URL='https://OWNER.github.io/REPOSITORY'
 node scripts/generate-feed.mjs
 ```

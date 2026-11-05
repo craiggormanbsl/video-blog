@@ -1,3 +1,4 @@
 dist/
 node_modules/
 videos/*.mp4
+podcast.private.json
