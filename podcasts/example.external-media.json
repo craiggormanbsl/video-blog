@@ -1,0 +1,23 @@
+{
+  "title": "Example Video Podcast",
+  "description": "A reusable video podcast configuration backed by an external media directory.",
+  "author": "Example Team",
+  "language": "en-us",
+  "category": "Business",
+  "subcategory": "Management",
+  "explicit": false,
+  "ownerName": "Example Owner",
+  "ownerEmail": "owner@example.com",
+  "image": "artwork.svg",
+  "mediaBaseUrl": "https://media.example.com/path/to/mp4",
+  "feedUrl": "https://media.example.com/path/to/mp4/feed.xml",
+  "episodes": [
+    {
+      "number": "01",
+      "title": "First episode",
+      "file": "01 - First episode.mp4",
+      "length": 0,
+      "publishedAt": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

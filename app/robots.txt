@@ -3,4 +3,4 @@ Disallow: /feed.xml
 Disallow: /episodes.json
 Disallow: /media/
 Disallow: /videos/
-Disallow: /artwork.jpg
+Disallow: /artwork.svg

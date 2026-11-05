@@ -12,8 +12,8 @@
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
 <meta name="googlebot" content="noindex, nofollow, noarchive, noimageindex">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="artwork.jpg">
-<link rel="icon" href="artwork.jpg">
+<link rel="apple-touch-icon" href="artwork.svg">
+<link rel="icon" href="artwork.svg">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; background: #000; color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -74,10 +74,10 @@
 <div id="app" class="hub-view">
   <section id="hub" aria-label="Video blogs">
     <div id="hub-title">
-      <img id="hub-art" src="artwork.jpg" alt="">
+      <img id="hub-art" src="artwork.svg" alt="">
       <div>
           <h1 id="hub-name">Video Library</h1>
-        <p id="hub-desc">SharePoint-backed RSS video feeds</p>
+        <p id="hub-desc">Independent video episodes</p>
       </div>
     </div>
     <div id="blogs" role="list"></div>
@@ -111,7 +111,7 @@
 <script>
 (() => {
   const KEY = `video-podcast-player-v1:${location.pathname}`;
-  const show = { title: 'Video Podcast', author: '', artwork: 'artwork.jpg' };
+  const show = { title: 'Video Podcast', author: '', artwork: 'artwork.svg' };
   const app = document.getElementById('app');
   const video = document.getElementById('video');
   const stage = document.getElementById('stage');
@@ -191,12 +191,12 @@
     Object.assign(show, metadata || {});
     document.title = show.title;
     hubName.textContent = 'Video Library';
-    hubDesc.textContent = show.description || 'SharePoint-backed RSS video feeds';
-    setImageSource(hubArt, show.artwork || 'artwork.jpg');
+    hubDesc.textContent = show.description || 'Independent video episodes';
+    setImageSource(hubArt, show.artwork || 'artwork.svg');
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
   }
 
-  function setImageSource(image, source, fallback = 'artwork.jpg') {
+  function setImageSource(image, source, fallback = 'artwork.svg') {
     image.onerror = () => {
       image.onerror = null;
       image.src = fallback;
@@ -408,7 +408,7 @@
     fetch('blogs.json').then((r) => r.ok ? r.json() : []).catch(() => []),
   ]).then(([metadata, data]) => {
     applyShowMetadata(metadata);
-    blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.jpg', feed: metadata.feed || 'feed.xml', accessCheckUrl: metadata.accessCheckUrl || metadata.feed || 'feed.xml', episodes: 'episodes.json' }];
+    blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.svg', feed: metadata.feed || 'feed.xml', accessCheckUrl: metadata.accessCheckUrl || metadata.feed || 'feed.xml', episodes: 'episodes.json' }];
     return Promise.all(blogs.map(async (blog) => ({ blog, accessible: await canAccessBlog(blog) }))).then((results) => {
       blogs = results.filter((result) => result.accessible).map((result) => result.blog);
       if (state.blog >= blogs.length) state.blog = 0;
