@@ -192,8 +192,16 @@
     document.title = show.title;
     hubName.textContent = 'Video Library';
     hubDesc.textContent = show.description || 'SharePoint-backed RSS video feeds';
-    hubArt.src = show.artwork || 'artwork.jpg';
+    setImageSource(hubArt, show.artwork || 'artwork.jpg');
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
+  }
+
+  function setImageSource(image, source, fallback = 'artwork.jpg') {
+    image.onerror = () => {
+      image.onerror = null;
+      image.src = fallback;
+    };
+    image.src = source || fallback;
   }
 
   function renderBlogs() {
@@ -205,7 +213,8 @@
       button.className = i === activeBlog ? 'active' : '';
       button.setAttribute('role', 'listitem');
       button.setAttribute('aria-label', 'Open ' + blog.title);
-      const img = Object.assign(document.createElement('img'), { src: blog.artwork || show.artwork, alt: '', loading: 'lazy' });
+      const img = Object.assign(document.createElement('img'), { alt: '', loading: 'lazy' });
+      setImageSource(img, blog.artwork || show.artwork);
       const label = document.createElement('span');
       label.className = 'blog-name';
       label.textContent = blog.title;
@@ -255,7 +264,8 @@
       li.tabIndex = 0;
       li.setAttribute('role', 'option');
       li.setAttribute('aria-label', ep.number + ' ' + ep.title);
-      const img = Object.assign(document.createElement('img'), { src: ep.artwork || show.artwork, alt: '', loading: 'lazy' });
+      const img = Object.assign(document.createElement('img'), { alt: '', loading: 'lazy' });
+      setImageSource(img, ep.artwork || show.artwork);
       const name = document.createElement('div');
       name.className = 'name';
       name.innerHTML = '<span class="num"></span>';
