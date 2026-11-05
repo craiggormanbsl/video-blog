@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#0b0b0b">
+  <title>SharePoint media test</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #0b0b0b; color: #f0f0f0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px 14px 40px; }
+    main { width: min(100%, 720px); margin: 0 auto; }
+    a { color: #58a6ff; }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; }
+    h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    p { line-height: 1.5; color: #c4cbd3; }
+    section { margin-top: 20px; padding: 16px; border: 1px solid #30363d; border-radius: 10px; background: #11161c; }
+    label { display: block; margin: 12px 0 6px; font-size: .9rem; font-weight: 600; }
+    input[type="url"] { width: 100%; min-height: 44px; padding: 9px 10px; border: 1px solid #555; border-radius: 6px; background: #080a0d; color: #fff; font: inherit; overflow-wrap: anywhere; }
+    button { min-height: 42px; margin-top: 10px; padding: 8px 14px; border: 0; border-radius: 6px; background: #1f6feb; color: white; font: inherit; font-weight: 650; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
+    output { display: block; min-height: 24px; margin-top: 12px; color: #d2dbe5; overflow-wrap: anywhere; }
+    .hint { margin-bottom: 0; font-size: .88rem; color: #9da7b2; }
+    .preview { display: block; max-width: 100%; max-height: 55vh; margin-top: 12px; object-fit: contain; background: #050608; }
+    video { display: block; width: 100%; max-height: 55vh; margin-top: 12px; background: #050608; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <p><a href="../">Back to video library</a></p>
+    <h1>SharePoint media test</h1>
+    <p>This standalone page tests SharePoint image and video URLs without changing the main player. For a useful comparison, first open the same file URL directly in this browser and complete any sign-in prompt, then return here and test it.</p>
+
+    <section aria-labelledby="image-heading">
+      <h2 id="image-heading">Image test</h2>
+      <form id="image-form">
+        <label for="image-url">Direct SharePoint image URL</label>
+        <input id="image-url" type="url" inputmode="url" autocomplete="url" placeholder="https://tenant.sharepoint.com/sites/..." required>
+        <button type="submit">Load image</button>
+      </form>
+      <output id="image-status" aria-live="polite"></output>
+      <img id="image-preview" class="preview" alt="SharePoint image preview" hidden>
+      <p class="hint">A successful load confirms this browser can display this image URL in the page. A failure is not definitive proof of an auth problem: the browser intentionally hides cross-site HTTP status, and blocked cookies, redirects, permissions, network policy, or an invalid URL can look similar.</p>
+    </section>
+
+    <section aria-labelledby="video-heading">
+      <h2 id="video-heading">Video test (optional)</h2>
+      <form id="video-form">
+        <label for="video-url">Direct SharePoint MP4 URL</label>
+        <input id="video-url" type="url" inputmode="url" autocomplete="url" placeholder="https://tenant.sharepoint.com/sites/.../video.mp4">
+        <button type="submit">Check video</button>
+      </form>
+      <output id="video-status" aria-live="polite"></output>
+      <video id="video-preview" controls playsinline preload="metadata" hidden></video>
+      <p class="hint">This requests video metadata first, not the entire file. If metadata loads but playback buffers or fails, file size/network throughput may contribute; codec support, SharePoint auth, or byte-range streaming can also be involved. The page cannot identify the exact cause on its own.</p>
+    </section>
+  </main>
+  <script>
+    const imageForm = document.getElementById('image-form');
+    const imageUrl = document.getElementById('image-url');
+    const imagePreview = document.getElementById('image-preview');
+    const imageStatus = document.getElementById('image-status');
+    let imageStartedAt = 0;
+
+    imageForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      imagePreview.hidden = true;
+      imagePreview.removeAttribute('src');
+      imageStatus.textContent = 'Loading image…';
+      imageStartedAt = performance.now();
+      imagePreview.src = imageUrl.value.trim();
+    });
+
+    imagePreview.addEventListener('load', () => {
+      imagePreview.hidden = false;
+      imageStatus.textContent = `Loaded in ${Math.round(performance.now() - imageStartedAt)} ms · ${imagePreview.naturalWidth} × ${imagePreview.naturalHeight} pixels.`;
+    });
+    imagePreview.addEventListener('error', () => {
+      imagePreview.hidden = true;
+      imageStatus.textContent = 'Image did not load. Check the URL and whether this browser is signed in; the page cannot read SharePoint’s HTTP response details.';
+    });
+
+    const videoForm = document.getElementById('video-form');
+    const videoUrl = document.getElementById('video-url');
+    const videoPreview = document.getElementById('video-preview');
+    const videoStatus = document.getElementById('video-status');
+    let videoStartedAt = 0;
+
+    videoForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!videoUrl.value.trim()) {
+        videoStatus.textContent = 'Enter a direct MP4 URL to test.';
+        return;
+      }
+      videoPreview.pause();
+      videoPreview.hidden = true;
+      videoPreview.removeAttribute('src');
+      videoPreview.load();
+      videoStatus.textContent = 'Requesting video metadata…';
+      videoStartedAt = performance.now();
+      videoPreview.src = videoUrl.value.trim();
+      videoPreview.load();
+    });
+
+    videoPreview.addEventListener('loadedmetadata', () => {
+      const duration = Number.isFinite(videoPreview.duration) ? `${Math.round(videoPreview.duration)} seconds` : 'unknown duration';
+      videoPreview.hidden = false;
+      videoStatus.textContent = `Metadata loaded in ${Math.round(performance.now() - videoStartedAt)} ms · ${videoPreview.videoWidth} × ${videoPreview.videoHeight} pixels · ${duration}. Press play to test streaming.`;
+    });
+    videoPreview.addEventListener('playing', () => {
+      videoStatus.textContent = 'Playback started.';
+    });
+    videoPreview.addEventListener('waiting', () => {
+      videoStatus.textContent = 'Buffering…';
+    });
+    videoPreview.addEventListener('error', () => {
+      const code = videoPreview.error?.code;
+      const reasons = {
+        1: 'loading was aborted',
+        2: 'a network error occurred',
+        3: 'the media could not be decoded',
+        4: 'the source or media format is unsupported',
+      };
+      videoStatus.textContent = `Video failed (${reasons[code] || 'unknown media error'}). Authentication, access policy, network/byte-range support, or codec compatibility may be involved.`;
+    });
+  </script>
+</body>
+</html>
