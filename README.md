@@ -12,6 +12,14 @@ The workflow republishes when `main` changes. For a fully public podcast, add MP
 
 For GitHub Actions publishing, add the complete podcast configuration JSON as the repository Actions secret `PODCAST_CONFIG_JSON` (**Settings > Secrets and variables > Actions**). The workflow writes it to the runner's temporary directory for the build; the config is not included in the repository or Pages artifact. Values needed by the public player or RSS feed, such as episode titles and media URLs, are still included in the generated public files.
 
+To commit, update the secret from the ignored local `podcast.private.json`, and publish in one step, install and sign in to GitHub CLI (`winget install --id GitHub.cli`, then `gh auth login`) and run:
+
+```powershell
+.\scripts\publish.ps1 -Message "Describe the change"
+```
+
+If only `podcast.private.json` changed, omit `-Message`; the script updates the secret and starts the publish workflow. Use `-DryRun` to preview the actions without committing, changing the secret, pushing, or starting a workflow.
+
 When local MP4 files are present, the GitHub Pages workflow extracts a thumbnail from each file and uses it as the episode image in the app and RSS feed. Local builds do the same when `ffmpeg` is available; otherwise they fall back to the podcast artwork.
 
 By default, media files are copied into the generated site with hashed public file names. To serve media from an external host instead, set `MEDIA_BASE_URL` when running `scripts/generate-feed.mjs` or set `mediaBaseUrl` in the podcast config. Episode URLs and RSS enclosures will point at that media folder instead of copying videos into the published site.
@@ -30,6 +38,10 @@ node scripts/generate-feed.mjs
 
 For an externally hosted podcast, put the media directory URL in `mediaBaseUrl`. If the local MP4 files should not be published with the site, list each episode in the config `episodes` array with its `file`, `title`, optional `number`, and `length` in bytes. If the generated `feed.xml` will be copied to another location, set `feedUrl` to its final URL. See `podcasts/example.external-media.json` for the shape.
 
-The generated landing page reads `blogs.json` and shows each configured blog as a feed card. By default the generator creates one card for the current podcast. To add more feeds to the public landing page, add a `blogs` array to the selected podcast config with each blog's `title`, `description`, `artwork`, `feed`, and `episodes` JSON path.
+The generated landing page reads `blogs.json` and shows each configured blog as a feed card. By default the generator creates one card using the podcast's JSON `title`. The first ` - ` in a card title starts a new line: the first part stays large and bold, and the remainder is a smaller, normal-weight subtitle. Titles without that separator stay on one line (wrapping as needed).
+
+The podcast's `image` can be a full HTTPS URL or a file path such as `artwork.svg`. Relative image paths resolve under `mediaBaseUrl` when configured, otherwise under the public site URL. The player attempts to display that image and falls back to the public generic artwork if it cannot load, including when SharePoint requires authorization. This does not prompt for sign-in or bypass SharePoint permissions.
+
+To add more feeds to the public landing page, add a `blogs` array to the selected podcast config with each blog's `title`, `description`, `artwork`, `feed`, and `episodes` JSON path. Each blog can alternatively supply `image`, with an optional per-blog `mediaBaseUrl`; it follows the same image URL resolution rules. Existing `artwork` URLs/paths are used unchanged. Each `episodes` path must point to that feed's available episode JSON.
 
 This feed uses `video/mp4` enclosures. Podcast apps differ in their support for video episodes, and Apple Podcasts may require a compatible video-podcast delivery format and directory setup beyond publishing this RSS feed.

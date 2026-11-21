@@ -29,6 +29,7 @@
   #blogs button.active { color: #fff; }
   #blogs img { width: min(68vw, 220px); max-width: 100%; aspect-ratio: 1; height: auto; border-radius: 12px; object-fit: cover; box-shadow: 0 18px 48px rgba(0,0,0,.38); }
   #blogs .blog-name { display: block; max-width: 100%; font-size: 20px; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+  #blogs .blog-subtitle { display: block; margin-top: 6px; font-size: 15px; line-height: 1.3; font-weight: 400; }
   #empty { display: none; flex: 1 1 auto; min-height: 0; place-items: center; padding: 24px; text-align: center; color: #c9d1d9; font-size: 20px; font-weight: 700; }
   #hub.empty #blogs { display: none; }
   #hub.empty #empty { display: grid; }
@@ -209,6 +210,7 @@
 
   function setImageSource(image, source, fallback = 'artwork.svg') {
     image.onerror = () => {
+      console.warn('Artwork could not be loaded; using public fallback.', image.src);
       image.onerror = null;
       image.src = fallback;
     };
@@ -228,7 +230,14 @@
       setImageSource(img, blog.artwork || show.artwork);
       const label = document.createElement('span');
       label.className = 'blog-name';
-      label.textContent = blog.title;
+      const separator = blog.title.indexOf(' - ');
+      label.textContent = separator < 0 ? blog.title : blog.title.slice(0, separator);
+      if (separator >= 0) {
+        const subtitle = document.createElement('span');
+        subtitle.className = 'blog-subtitle';
+        subtitle.textContent = blog.title.slice(separator + 3);
+        label.append(subtitle);
+      }
       button.append(img, label);
       button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
       blogsList.append(button);

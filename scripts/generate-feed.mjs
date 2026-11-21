@@ -13,7 +13,7 @@ const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
 const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
 const accessCheckUrl = (process.env.ACCESS_CHECK_URL || config.accessCheckUrl || feedUrl).replace(/\/$/, '');
-const artworkUrl = absoluteUrl(config.image || 'artwork.svg');
+const artworkUrl = config.image ? imageUrl(config.image) : absoluteUrl('artwork.svg');
 
 if (!siteUrl) {
   throw new Error('Set SITE_URL to the public HTTPS URL for this GitHub Pages site.');
@@ -54,6 +54,10 @@ function commandExists(command) {
 
 function absoluteUrl(value) {
   return /^https?:\/\//i.test(value) ? value : `${siteUrl}/${encodedPath(value)}`;
+}
+
+function imageUrl(value, baseUrl = mediaBaseUrl) {
+  return /^https?:\/\//i.test(value) ? value : `${(baseUrl || siteUrl).replace(/\/$/, '')}/${encodedPath(value)}`;
 }
 
 async function localFileInfo(filePath) {
@@ -171,7 +175,10 @@ await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
   feed: feedUrl,
   accessCheckUrl,
 }, null, 2));
-await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.blogs || [{
+await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.blogs ? config.blogs.map((blog) => ({
+  ...blog,
+  artwork: blog.image ? imageUrl(blog.image, blog.mediaBaseUrl || mediaBaseUrl) : blog.artwork || artworkUrl,
+})) : [{
   title: config.title,
   description: config.description,
   author: config.author,
