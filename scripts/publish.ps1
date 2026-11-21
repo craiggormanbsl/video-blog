@@ -38,6 +38,10 @@ if ($branch -ne 'main') { throw "Publishing must be run from main. Current branc
 $trackedConfig = & git ls-files -- $ConfigPath
 if ($trackedConfig) { throw "$ConfigPath is tracked by Git. Remove it from the index before publishing." }
 
+$portableGh = Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI'
+if (-not (Get-Command gh -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $portableGh 'gh.exe'))) {
+    $env:Path = "$portableGh;$env:Path"
+}
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     $ghMessage = 'GitHub CLI is required. Install it with: winget install --id GitHub.cli; then run: gh auth login'
     if ($DryRun) { Write-Warning $ghMessage } else { throw $ghMessage }

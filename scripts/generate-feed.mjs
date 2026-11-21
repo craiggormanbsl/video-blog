@@ -6,21 +6,17 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDirectory = path.join(root, 'dist');
-const videosDirectory = path.join(root, 'videos');
 const configPath = path.resolve(root, process.env.PODCAST_CONFIG || 'podcast.json');
 const config = JSON.parse(await readFile(configPath, 'utf8'));
 const siteUrl = process.env.SITE_URL?.replace(/\/$/, '');
-const mediaBaseUrl = (process.env.MEDIA_BASE_URL || config.mediaBaseUrl || '').replace(/\/$/, '');
-const feedUrl = (process.env.FEED_URL || config.feedUrl || `${siteUrl}/feed.xml`).replace(/\/$/, '');
-const accessCheckUrl = (process.env.ACCESS_CHECK_URL || config.accessCheckUrl || feedUrl).replace(/\/$/, '');
-const artworkUrl = config.image ? imageUrl(config.image) : absoluteUrl('artwork.svg');
+const inheritedFields = ['author', 'language', 'category', 'subcategory', 'explicit', 'ownerName', 'ownerEmail'];
 
 if (!siteUrl) {
   throw new Error('Set SITE_URL to the public HTTPS URL for this GitHub Pages site.');
 }
 
 function escapeXml(value) {
-  return String(value).replace(/[<>&"']/g, (character) => ({
+  return String(value ?? '').replace(/[<>&"']/g, (character) => ({
     '<': '&lt;',
     '>': '&gt;',
     '&': '&amp;',
@@ -33,14 +29,8 @@ function encodedPath(fileName) {
   return fileName.split('/').map(encodeURIComponent).join('/');
 }
 
-function publicMediaName(fileName) {
-  const hash = createHash('sha256').update(fileName).digest('hex').slice(0, 16);
-  return `${hash}.mp4`;
-}
-
-function publicThumbnailName(fileName) {
-  const hash = createHash('sha256').update(fileName).digest('hex').slice(0, 16);
-  return `${hash}.jpg`;
+function hashedName(value, extension) {
+  return `${createHash('sha256').update(value).digest('hex').slice(0, 16)}.${extension}`;
 }
 
 function commandExists(command) {
@@ -52,12 +42,20 @@ function commandExists(command) {
   }
 }
 
-function absoluteUrl(value) {
-  return /^https?:\/\//i.test(value) ? value : `${siteUrl}/${encodedPath(value)}`;
+function isAbsoluteUrl(value) {
+  return /^https?:\/\//i.test(value);
 }
 
-function imageUrl(value, baseUrl = mediaBaseUrl) {
-  return /^https?:\/\//i.test(value) ? value : `${(baseUrl || siteUrl).replace(/\/$/, '')}/${encodedPath(value)}`;
+function absoluteUrl(value) {
+  return isAbsoluteUrl(value) ? value : `${siteUrl}/${encodedPath(value)}`;
+}
+
+function imageUrl(value, baseUrl) {
+  return isAbsoluteUrl(value) ? value : `${(baseUrl || siteUrl).replace(/\/$/, '')}/${encodedPath(value)}`;
+}
+
+function slug(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 async function localFileInfo(filePath) {
@@ -80,84 +78,124 @@ function publicationDate(filePath, modifiedAt) {
   return modifiedAt;
 }
 
-const configuredEpisodes = Array.isArray(config.episodes) ? config.episodes : [];
-const videoNames = configuredEpisodes.length
-  ? configuredEpisodes.map((episode) => episode.file)
-  : (await readdir(videosDirectory))
-    .filter((name) => name.toLowerCase().endsWith('.mp4'))
-    .sort((left, right) => left.localeCompare(right, 'en'));
-
-if (videoNames.length === 0) {
-  throw new Error('No MP4 episodes found in videos/.');
+function podcastDefinitions() {
+  if (config.podcasts !== undefined && !Array.isArray(config.podcasts)) {
+    throw new Error('"podcasts" must be an array.');
+  }
+  if (Array.isArray(config.podcasts) && config.podcasts.length === 0) {
+    throw new Error('"podcasts" must contain at least one podcast.');
+  }
+  const shared = Object.fromEntries(inheritedFields.filter((field) => config[field] !== undefined).map((field) => [field, config[field]]));
+  // A config without "podcasts" is the original single-podcast format.
+  const podcasts = Array.isArray(config.podcasts) ? config.podcasts.map((podcast) => ({ ...shared, ...podcast })) : [config];
+  const ids = new Set();
+  return podcasts.map((podcast, index) => {
+    if (!podcast || typeof podcast !== 'object' || Array.isArray(podcast)) throw new Error(`Podcast ${index + 1} must be an object.`);
+    if (!podcast.title) throw new Error(`Podcast ${index + 1} needs a "title".`);
+    const id = slug(podcast.id || podcast.title);
+    if (!id) throw new Error(`Podcast ${index + 1} needs an "id" containing letters or numbers.`);
+    if (ids.has(id)) throw new Error(`Duplicate podcast id "${id}". Set a unique "id" for each podcast.`);
+    ids.add(id);
+    return { ...podcast, id };
+  });
 }
+
+const podcasts = podcastDefinitions();
+const canGenerateThumbnails = commandExists('ffmpeg');
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
-if (!mediaBaseUrl) await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
-const canGenerateThumbnails = commandExists('ffmpeg');
-if (canGenerateThumbnails) await mkdir(path.join(outputDirectory, 'thumbnails'), { recursive: true });
 
-const items = [];
-const episodes = [];
-for (const name of videoNames) {
-  const configuredEpisode = configuredEpisodes.find((episode) => episode.file === name) || {};
-  const sourcePath = path.join(videosDirectory, name);
-  const fileInfo = await localFileInfo(sourcePath);
-  if (!fileInfo && !mediaBaseUrl) throw new Error(`Missing local video: ${name}`);
-  const mediaName = publicMediaName(name);
-  const mediaPath = `media/${mediaName}`;
-  const mediaUrl = mediaBaseUrl ? `${mediaBaseUrl}/${encodedPath(name)}` : `${siteUrl}/${mediaPath}`;
-  const thumbnailPath = `thumbnails/${publicThumbnailName(name)}`;
-  const episodeArtwork = configuredEpisode.artwork || (fileInfo && canGenerateThumbnails ? thumbnailPath : artworkUrl);
-  const title = configuredEpisode.title || name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
-  const publishedAt = configuredEpisode.publishedAt
-    ? new Date(configuredEpisode.publishedAt)
-    : publicationDate(path.relative(root, sourcePath), fileInfo?.mtime || new Date());
+const blogs = [];
+let episodeCount = 0;
+for (const [index, podcast] of podcasts.entries()) {
+  const isDefault = index === 0;
+  // The first podcast keeps the original root URLs so existing subscriptions and resume positions still work.
+  const outputPrefix = isDefault ? '' : `podcasts/${podcast.id}/`;
+  const mediaBaseUrl = ((isDefault && process.env.MEDIA_BASE_URL) || podcast.mediaBaseUrl || '').replace(/\/$/, '');
+  const feedUrl = ((isDefault && process.env.FEED_URL) || podcast.feedUrl || `${siteUrl}/${outputPrefix}feed.xml`).replace(/\/$/, '');
+  const accessCheckUrl = ((isDefault && process.env.ACCESS_CHECK_URL) || podcast.accessCheckUrl || feedUrl).replace(/\/$/, '');
+  const artworkUrl = podcast.image ? imageUrl(podcast.image, mediaBaseUrl) : absoluteUrl(podcast.artwork || 'artwork.svg');
+  const videosDirectory = path.resolve(root, podcast.videosDirectory || (isDefault ? 'videos' : `videos/${podcast.id}`));
+  const configuredEpisodes = Array.isArray(podcast.episodes) ? podcast.episodes : [];
+  const videoNames = configuredEpisodes.length
+    ? configuredEpisodes.map((episode) => episode.file)
+    : ((await readdir(videosDirectory).catch(() => [])))
+      .filter((name) => name.toLowerCase().endsWith('.mp4'))
+      .sort((left, right) => left.localeCompare(right, 'en'));
 
-  if (!mediaBaseUrl) await copyFile(sourcePath, path.join(outputDirectory, 'media', mediaName));
-  if (!configuredEpisode.artwork && fileInfo && canGenerateThumbnails) {
-    execFileSync('ffmpeg', [
-      '-y',
-      '-ss', '00:00:05',
-      '-i', sourcePath,
-      '-frames:v', '1',
-      '-vf', 'scale=320:-1',
-      path.join(outputDirectory, thumbnailPath),
-    ], { stdio: 'ignore' });
+  if (videoNames.length === 0) {
+    throw new Error(`No MP4 episodes found for "${podcast.title}" in ${path.relative(root, videosDirectory)}/ or its "episodes" list.`);
   }
-  episodes.push({
-    number: configuredEpisode.number || name.match(/^(\d+)/)?.[1] || '',
-    title,
-    file: name,
-    url: mediaBaseUrl ? mediaUrl : encodedPath(mediaPath),
-    artwork: episodeArtwork,
-  });
-  items.push(`    <item>
+
+  const podcastOutput = path.join(outputDirectory, outputPrefix);
+  await mkdir(podcastOutput, { recursive: true });
+  const items = [];
+  const episodes = [];
+  for (const name of videoNames) {
+    if (!name) throw new Error(`Every episode in "${podcast.title}" needs a "file".`);
+    const configuredEpisode = configuredEpisodes.find((episode) => episode.file === name) || {};
+    const sourcePath = path.join(videosDirectory, name);
+    const fileInfo = await localFileInfo(sourcePath);
+    if (!fileInfo && !mediaBaseUrl) throw new Error(`Missing local video for "${podcast.title}": ${name}`);
+    const hashSource = isDefault ? name : `${podcast.id}/${name}`;
+    const mediaPath = `media/${hashedName(hashSource, 'mp4')}`;
+    const mediaUrl = mediaBaseUrl ? `${mediaBaseUrl}/${encodedPath(name)}` : `${siteUrl}/${mediaPath}`;
+    const thumbnailPath = `thumbnails/${hashedName(hashSource, 'jpg')}`;
+    const episodeArtwork = configuredEpisode.artwork || (fileInfo && canGenerateThumbnails ? thumbnailPath : artworkUrl);
+    const title = configuredEpisode.title || name.replace(/\.mp4$/i, '').replace(/^\d+\s*-\s*/, '').trim();
+    const publishedAt = configuredEpisode.publishedAt
+      ? new Date(configuredEpisode.publishedAt)
+      : publicationDate(path.relative(root, sourcePath), fileInfo?.mtime || new Date());
+
+    if (!mediaBaseUrl) {
+      await mkdir(path.join(outputDirectory, 'media'), { recursive: true });
+      await copyFile(sourcePath, path.join(outputDirectory, mediaPath));
+    }
+    if (!configuredEpisode.artwork && fileInfo && canGenerateThumbnails) {
+      await mkdir(path.join(outputDirectory, 'thumbnails'), { recursive: true });
+      execFileSync('ffmpeg', [
+        '-y',
+        '-ss', '00:00:05',
+        '-i', sourcePath,
+        '-frames:v', '1',
+        '-vf', 'scale=320:-1',
+        path.join(outputDirectory, thumbnailPath),
+      ], { stdio: 'ignore' });
+    }
+    episodes.push({
+      number: configuredEpisode.number || name.match(/^(\d+)/)?.[1] || '',
+      title,
+      file: name,
+      url: mediaBaseUrl ? mediaUrl : encodedPath(mediaPath),
+      artwork: episodeArtwork,
+    });
+    items.push(`    <item>
       <title>${escapeXml(title)}</title>
       <guid isPermaLink="false">${escapeXml(mediaUrl)}</guid>
       <pubDate>${publishedAt.toUTCString()}</pubDate>
       <enclosure url="${escapeXml(mediaUrl)}" length="${fileInfo?.size || configuredEpisode.length || 0}" type="video/mp4" />
       <itunes:image href="${escapeXml(absoluteUrl(episodeArtwork))}" />
-      <itunes:summary>${escapeXml(config.description)}</itunes:summary>
+      <itunes:summary>${escapeXml(podcast.description)}</itunes:summary>
     </item>`);
-}
+  }
 
-const feed = `<?xml version="1.0" encoding="UTF-8"?>
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>${escapeXml(config.title)}</title>
+    <title>${escapeXml(podcast.title)}</title>
     <link>${escapeXml(siteUrl)}</link>
-    <description>${escapeXml(config.description)}</description>
-    <language>${escapeXml(config.language)}</language>
-    <itunes:author>${escapeXml(config.author)}</itunes:author>
-    <itunes:explicit>${config.explicit ? 'true' : 'false'}</itunes:explicit>
-    <itunes:category text="${escapeXml(config.category)}">
-      <itunes:category text="${escapeXml(config.subcategory)}" />
+    <description>${escapeXml(podcast.description)}</description>
+    <language>${escapeXml(podcast.language)}</language>
+    <itunes:author>${escapeXml(podcast.author)}</itunes:author>
+    <itunes:explicit>${podcast.explicit ? 'true' : 'false'}</itunes:explicit>
+    <itunes:category text="${escapeXml(podcast.category)}">
+      <itunes:category text="${escapeXml(podcast.subcategory)}" />
     </itunes:category>
     <itunes:image href="${escapeXml(artworkUrl)}" />
-${config.ownerName && config.ownerEmail ? `    <itunes:owner>
-      <itunes:name>${escapeXml(config.ownerName)}</itunes:name>
-      <itunes:email>${escapeXml(config.ownerEmail)}</itunes:email>
+${podcast.ownerName && podcast.ownerEmail ? `    <itunes:owner>
+      <itunes:name>${escapeXml(podcast.ownerName)}</itunes:name>
+      <itunes:email>${escapeXml(podcast.ownerEmail)}</itunes:email>
     </itunes:owner>` : ''}
     <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />
 ${items.join('\n')}
@@ -165,28 +203,30 @@ ${items.join('\n')}
 </rss>
 `;
 
-await writeFile(path.join(outputDirectory, 'feed.xml'), feed);
+  await writeFile(path.join(podcastOutput, 'feed.xml'), feed);
+  await writeFile(path.join(podcastOutput, 'episodes.json'), JSON.stringify(episodes, null, 2));
+  blogs.push({
+    id: podcast.id,
+    title: podcast.title,
+    description: podcast.description,
+    author: podcast.author,
+    artwork: artworkUrl,
+    feed: feedUrl,
+    accessCheckUrl,
+    episodes: `${outputPrefix}episodes.json`,
+  });
+  episodeCount += items.length;
+}
+
 await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
 await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
   title: config.siteTitle || 'Video Library',
   description: config.siteDescription || 'Independent video episodes.',
-  author: config.author,
-  artwork: artworkUrl,
-  feed: feedUrl,
-  accessCheckUrl,
+  author: blogs[0].author,
+  artwork: blogs[0].artwork,
+  feed: blogs[0].feed,
+  accessCheckUrl: blogs[0].accessCheckUrl,
 }, null, 2));
-await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(config.blogs ? config.blogs.map((blog) => ({
-  ...blog,
-  artwork: blog.image ? imageUrl(blog.image, blog.mediaBaseUrl || mediaBaseUrl) : blog.artwork || artworkUrl,
-})) : [{
-  title: config.title,
-  description: config.description,
-  author: config.author,
-  artwork: artworkUrl,
-  feed: feedUrl,
-  accessCheckUrl,
-  episodes: 'episodes.json',
-}], null, 2));
-await writeFile(path.join(outputDirectory, 'episodes.json'), JSON.stringify(episodes, null, 2));
+await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(blogs, null, 2));
 await copyFile(path.join(root, 'artwork.svg'), path.join(outputDirectory, 'artwork.svg'));
-console.log(`Generated ${items.length} episodes from ${path.relative(root, configPath)} at ${path.join(outputDirectory, 'feed.xml')}`);
+console.log(`Generated ${podcasts.length} podcast(s) and ${episodeCount} episodes from ${path.relative(root, configPath)} in ${outputDirectory}`);
