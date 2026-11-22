@@ -36,10 +36,14 @@
   #blogs button:nth-child(4n+3) { --card-a: #8e2ab8; --card-b: #e88fc0; }
   #blogs button:nth-child(4n+4) { --card-a: #d9605f; --card-b: #f3d98e; }
   #blogs img { position: relative; z-index: 1; flex: 0 0 auto; width: 96px; height: 96px; border-radius: 16px; object-fit: cover; background: rgba(255,255,255,.15); box-shadow: 0 8px 20px rgba(0,0,0,.3); }
-  #blogs .blog-name { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; font-size: 24px; line-height: 1.15; font-weight: 700; overflow-wrap: anywhere; text-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  #blogs .blog-name { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; font-size: 24px; line-height: 1.15; font-weight: 700; overflow-wrap: break-word; text-shadow: 0 2px 8px rgba(0,0,0,.25); }
   #blogs .blog-subtitle { display: block; margin-top: 6px; font-size: 16px; line-height: 1.3; font-weight: 400; opacity: .95; }
   #blogs .blog-arrow { position: relative; z-index: 1; flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.22); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
   #blogs .blog-arrow svg { width: 24px; height: 24px; }
+  #blogs .blog-soon { display: inline-block; margin-top: 10px; padding: 5px 11px; border-radius: 999px; background: rgba(0,0,0,.25); font-size: 13px; line-height: 1.2; font-weight: 600; white-space: nowrap; text-shadow: none; }
+  #blogs button.coming-soon { cursor: default; }
+  #blogs button.coming-soon:hover { filter: none; }
+  #blogs button.coming-soon:active { transform: none; }
   @media (max-width: 380px) { #blogs img { width: 76px; height: 76px; } #blogs .blog-name { font-size: 20px; } #blogs .blog-subtitle { font-size: 14px; } #blogs .blog-arrow { width: 40px; height: 40px; } }
   #empty { display: none; flex: 1 1 auto; min-height: 0; place-items: center; padding: 24px; text-align: center; color: #c9d1d9; font-size: 20px; font-weight: 700; }
   #hub.empty #blogs { display: none; }
@@ -256,12 +260,24 @@
         subtitle.textContent = blog.title.slice(separator + 3);
         label.append(subtitle);
       }
+      const comingSoon = blog.episodeCount === 0;
       const arrow = document.createElement('span');
-      arrow.className = 'blog-arrow';
       arrow.setAttribute('aria-hidden', 'true');
-      arrow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
-      button.append(img, label, arrow);
-      button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
+      if (comingSoon) {
+        const soon = document.createElement('span');
+        soon.className = 'blog-soon';
+        soon.textContent = 'Coming soon';
+        label.append(soon);
+        button.classList.add('coming-soon');
+        button.setAttribute('aria-disabled', 'true');
+        button.setAttribute('aria-label', blog.title + ', coming soon');
+        button.append(img, label);
+      } else {
+        arrow.className = 'blog-arrow';
+        arrow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+        button.addEventListener('click', () => loadBlog(i, { openPlayer: true, restore: i === state.blog }));
+        button.append(img, label, arrow);
+      }
       blogsList.append(button);
     });
   }

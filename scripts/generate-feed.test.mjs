@@ -137,3 +137,18 @@ test('order changes landing-page position without moving feed paths', async (t) 
     ['first', 'episodes.json'],
   ]);
 });
+test('an explicit empty episodes list publishes a coming-soon set', async (t) => {
+  const directory = await workspace(t);
+  const { blogs } = await generate(directory, {
+    podcasts: [
+      { id: 'live', title: 'Live', mediaBaseUrl, episodes: [{ file: 'one.mp4' }] },
+      { id: 'soon', title: 'Soon', mediaBaseUrl, episodes: [] },
+    ],
+  });
+  assert.deepEqual(blogs.map((blog) => [blog.id, blog.episodeCount]), [['live', 1], ['soon', 0]]);
+});
+
+test('a podcast with no episodes and no videos is rejected', async (t) => {
+  const directory = await workspace(t);
+  await assert.rejects(generate(directory, { podcasts: [{ id: 'none', title: 'None', mediaBaseUrl }] }), /No MP4 episodes found/);
+});

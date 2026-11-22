@@ -128,7 +128,8 @@ for (const [index, podcast] of podcasts.entries()) {
       .filter((name) => name.toLowerCase().endsWith('.mp4'))
       .sort((left, right) => left.localeCompare(right, 'en'));
 
-  if (videoNames.length === 0) {
+  // An explicit empty "episodes" list publishes a "coming soon" set; otherwise a set with no videos is a config mistake.
+  if (videoNames.length === 0 && !(Array.isArray(podcast.episodes) && podcast.episodes.length === 0)) {
     throw new Error(`No MP4 episodes found for "${podcast.title}" in ${path.relative(root, videosDirectory)}/ or its "episodes" list.`);
   }
 
@@ -218,6 +219,7 @@ ${items.join('\n')}
     feed: feedUrl,
     accessCheckUrl,
     episodes: `${outputPrefix}episodes.json`,
+    episodeCount: episodes.length,
   });
   displayOrder.push(podcast.order === undefined ? index : Number(podcast.order));
   episodeCount += items.length;
