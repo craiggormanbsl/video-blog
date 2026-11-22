@@ -36,12 +36,15 @@ $env:SITE_URL='https://OWNER.github.io/REPOSITORY'
 node scripts/generate-feed.mjs
 ```
 
-For an externally hosted podcast, put the media directory URL in `mediaBaseUrl`. If the local MP4 files should not be published with the site, list each episode in the config `episodes` array with its `file`, `title`, optional `number`, and `length` in bytes. If the generated `feed.xml` will be copied to another location, set `feedUrl` to its final URL. See `podcasts/example.external-media.json` for the shape.
+The config has site-wide settings at the top level (`siteTitle`, `siteDescription`, and defaults such as `author`, `language`, `category`, `subcategory`, `explicit`, `ownerName`, `ownerEmail`) and a `podcasts` array with one entry per podcast set. Each entry needs a unique `id` and a `title`, and may override any of the top-level defaults. See `podcasts/example.external-media.json` for the shape. The original single-podcast format (no `podcasts` array) is still accepted.
 
-The generated landing page reads `blogs.json` and shows each configured blog as a feed card. By default the generator creates one card using the podcast's JSON `title`. The first ` - ` in a card title starts a new line: the first part stays large and bold, and the remainder is a smaller, normal-weight subtitle. Titles without that separator stay on one line (wrapping as needed).
+The first podcast publishes to the site root (`feed.xml`, `episodes.json`) so existing links keep working; each later podcast publishes to `podcasts/<id>/feed.xml` and `podcasts/<id>/episodes.json`. Local MP4s for the first podcast go in `videos/`; later podcasts use `videos/<id>/` unless `videosDirectory` is set.
+
+For an externally hosted podcast, put the media directory URL in that podcast's `mediaBaseUrl`. If the local MP4 files should not be published with the site, list each episode in the podcast's `episodes` array with its `file`, `title`, optional `number`, and `length` in bytes. If the generated `feed.xml` will be copied to another location, set `feedUrl` to its final URL. `accessCheckUrl` (defaulting to `feedUrl`) is checked by the landing page to decide whether to show the podcast.
+
+The generated landing page reads `blogs.json` and shows each podcast as a card using its JSON `title`. The first ` - ` in a card title starts a new line: the first part stays large and bold, and the remainder is a smaller, normal-weight subtitle. Titles without that separator stay on one line (wrapping as needed).
 
 The podcast's `image` can be a full HTTPS URL or a file path such as `artwork.svg`. Relative image paths resolve under `mediaBaseUrl` when configured, otherwise under the public site URL. The player attempts to display that image and falls back to the public generic artwork if it cannot load, including when SharePoint requires authorization. This does not prompt for sign-in or bypass SharePoint permissions.
 
-To add more feeds to the public landing page, add a `blogs` array to the selected podcast config with each blog's `title`, `description`, `artwork`, `feed`, and `episodes` JSON path. Each blog can alternatively supply `image`, with an optional per-blog `mediaBaseUrl`; it follows the same image URL resolution rules. Existing `artwork` URLs/paths are used unchanged. Each `episodes` path must point to that feed's available episode JSON.
 
 This feed uses `video/mp4` enclosures. Podcast apps differ in their support for video episodes, and Apple Podcasts may require a compatible video-podcast delivery format and directory setup beyond publishing this RSS feed.
