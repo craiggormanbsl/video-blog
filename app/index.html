@@ -248,12 +248,22 @@
     const url = blog.accessCheckUrl || blog.feed;
     const fallbackImage = blog.artwork && /^https?:\/\//i.test(blog.artwork) ? blog.artwork : '';
     if (!url && !fallbackImage) return true;
+    // Cross-origin hosts such as SharePoint send no CORS headers, so a readable fetch always fails and logs a CORS error.
+    if (url && isSameOrigin(url)) {
+      try {
+        const response = await fetch(url, { cache: 'no-store', credentials: 'include' });
+        return response.ok;
+      } catch {}
+    }
+    if (fallbackImage && await canLoadImage(fallbackImage)) return true;
+    return canReachOpaque(url);
+  }
+
+  function isSameOrigin(url) {
     try {
-      const response = await fetch(url, { cache: 'no-store', credentials: 'include' });
-      return response.ok;
+      return new URL(url, location.href).origin === location.origin;
     } catch {
-      if (fallbackImage && await canLoadImage(fallbackImage)) return true;
-      return canReachOpaque(url);
+      return false;
     }
   }
 
