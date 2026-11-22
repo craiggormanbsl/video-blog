@@ -219,13 +219,20 @@
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
   }
 
+  // Bypass stale browser copies of externally hosted artwork once per page load; same-origin files are left cacheable.
+  const artworkVersion = Date.now();
+  function freshArtworkUrl(url) {
+    if (!url || !/^https?:\/\//i.test(url) || isSameOrigin(url)) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}v=${artworkVersion}`;
+  }
+
   function setImageSource(image, source, fallback = 'artwork.svg') {
     image.onerror = () => {
-      console.warn('Artwork could not be loaded; using public fallback.', image.src);
+      console.warn('Artwork could not be loaded; using public fallback.', source);
       image.onerror = null;
       image.src = fallback;
     };
-    image.src = source || fallback;
+    image.src = freshArtworkUrl(source) || fallback;
   }
 
   function renderBlogs() {
@@ -297,7 +304,7 @@
       const image = new Image();
       image.onload = () => resolve(true);
       image.onerror = () => resolve(false);
-      image.src = `${url}${url.includes('?') ? '&' : '?'}access-check=${Date.now()}`;
+      image.src = freshArtworkUrl(url);
     });
   }
 
