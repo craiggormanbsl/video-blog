@@ -95,6 +95,9 @@ function podcastDefinitions() {
     const id = slug(podcast.id || podcast.title);
     if (!id) throw new Error(`Podcast ${index + 1} needs an "id" containing letters or numbers.`);
     if (ids.has(id)) throw new Error(`Duplicate podcast id "${id}". Set a unique "id" for each podcast.`);
+    if (podcast.order !== undefined && (typeof podcast.order !== 'number' || !Number.isFinite(podcast.order))) {
+      throw new Error(`Podcast "${id}" has an invalid "order"; use a number.`);
+    }
     ids.add(id);
     return { ...podcast, id };
   });
@@ -107,6 +110,7 @@ await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 
 const blogs = [];
+const displayOrder = [];
 let episodeCount = 0;
 for (const [index, podcast] of podcasts.entries()) {
   const isDefault = index === 0;
@@ -215,8 +219,14 @@ ${items.join('\n')}
     accessCheckUrl,
     episodes: `${outputPrefix}episodes.json`,
   });
+  displayOrder.push(podcast.order === undefined ? index : Number(podcast.order));
   episodeCount += items.length;
 }
+
+// "order" changes landing-page position only; output paths stay tied to config position so feed URLs never move.
+const orderedBlogs = blogs.map((blog, index) => ({ blog, order: displayOrder[index], index }))
+  .sort((left, right) => left.order - right.order || left.index - right.index)
+  .map(({ blog }) => blog);
 
 await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
 await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
@@ -227,6 +237,6 @@ await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
   feed: blogs[0].feed,
   accessCheckUrl: blogs[0].accessCheckUrl,
 }, null, 2));
-await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(blogs, null, 2));
+await writeFile(path.join(outputDirectory, 'blogs.json'), JSON.stringify(orderedBlogs, null, 2));
 await copyFile(path.join(root, 'artwork.svg'), path.join(outputDirectory, 'artwork.svg'));
 console.log(`Generated ${podcasts.length} podcast(s) and ${episodeCount} episodes from ${path.relative(root, configPath)} in ${outputDirectory}`);

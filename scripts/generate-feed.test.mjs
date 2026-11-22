@@ -122,3 +122,18 @@ test('podcasts array rejects duplicate ids', async (t) => {
     /Duplicate podcast id "same"/,
   );
 });
+
+test('order changes landing-page position without moving feed paths', async (t) => {
+  const directory = await workspace(t);
+  const episodes = [{ file: 'one.mp4' }];
+  const { blogs } = await generate(directory, {
+    podcasts: [
+      { id: 'first', title: 'First', mediaBaseUrl, episodes, order: 2 },
+      { id: 'second', title: 'Second', mediaBaseUrl, episodes, order: 1 },
+    ],
+  });
+  assert.deepEqual(blogs.map((blog) => [blog.id, blog.episodes]), [
+    ['second', 'podcasts/second/episodes.json'],
+    ['first', 'episodes.json'],
+  ]);
+});
