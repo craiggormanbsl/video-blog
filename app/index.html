@@ -417,7 +417,7 @@
     Object.assign(show, { title: blog.title, description: blog.description || show.description, author: blog.author || show.author, artwork: blog.artwork || show.artwork });
     document.title = show.title;
     renderBlogs();
-    return fetch(blog.episodes || 'episodes.json').then((r) => r.json()).then((data) => {
+    return fetch(blog.episodes || 'episodes.json', { cache: 'no-cache' }).then((r) => r.json()).then((data) => {
       episodes = data;
       if (!(state.index >= 0 && state.index < episodes.length)) state.index = 0;
       if (!(state.browseIndex >= 0 && state.browseIndex < episodes.length)) state.browseIndex = state.index;
@@ -525,8 +525,9 @@
   }
 
   Promise.all([
-    fetch('site.json').then((r) => r.ok ? r.json() : {}).catch(() => ({})),
-    fetch('blogs.json').then((r) => r.ok ? r.json() : []).catch(() => []),
+    // no-cache revalidates with the server so newly published sets/episodes appear immediately.
+    fetch('site.json', { cache: 'no-cache' }).then((r) => r.ok ? r.json() : {}).catch(() => ({})),
+    fetch('blogs.json', { cache: 'no-cache' }).then((r) => r.ok ? r.json() : []).catch(() => []),
   ]).then(([metadata, data]) => {
     applyShowMetadata(metadata);
     blogs = data.length ? data : [{ title: metadata.title || 'Video Podcast', description: metadata.description || '', artwork: metadata.artwork || 'artwork.svg', feed: metadata.feed || 'feed.xml', accessCheckUrl: metadata.accessCheckUrl || metadata.feed || 'feed.xml', episodes: 'episodes.json' }];

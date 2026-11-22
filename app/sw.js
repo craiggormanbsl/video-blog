@@ -1,4 +1,4 @@
-const CACHE = 'video-podcast-shell-v8';
+const CACHE = 'video-podcast-shell-v9';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'artwork.svg'];
 
 self.addEventListener('install', (event) => {
