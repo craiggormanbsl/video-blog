@@ -220,7 +220,7 @@ ${items.join('\n')}
 
 await cp(path.join(root, 'app'), outputDirectory, { recursive: true });
 await writeFile(path.join(outputDirectory, 'site.json'), JSON.stringify({
-  title: config.siteTitle || 'Video Library',
+  title: config.siteTitle || 'Video Podcasts',
   description: config.siteDescription || 'Independent video episodes.',
   author: blogs[0].author,
   artwork: blogs[0].artwork,

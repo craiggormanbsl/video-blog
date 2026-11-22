@@ -90,7 +90,7 @@
     <div id="hub-title">
       <img id="hub-art" src="artwork.svg" alt="">
       <div>
-          <h1 id="hub-name">Video Library</h1>
+          <h1 id="hub-name">Video Podcasts</h1>
         <p id="hub-desc">Independent video episodes</p>
       </div>
     </div>
@@ -213,7 +213,7 @@
   function applyShowMetadata(metadata) {
     Object.assign(show, metadata || {});
     document.title = show.title;
-    hubName.textContent = 'Video Library';
+    hubName.textContent = 'Video Podcasts';
     hubDesc.textContent = show.description || 'Independent video episodes';
     setImageSource(hubArt, show.artwork || 'artwork.svg');
     document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', show.title);
